@@ -61,6 +61,10 @@ void StreamingFromMegaDialog::closeEvent(QCloseEvent *event)
 
     QPointer<QMessageBox> msg = new QMessageBox(this);
     msg->setIcon(QMessageBox::Question);
+    //        TO-DO: Uncomment when asset is included to the project
+    //        msg->setIconPixmap(QPixmap(Utilities::getDevicePixelRatio() < 2 ? QString::fromUtf8(":/images/mbox-question.png")
+    //                                                            : QString::fromUtf8(":/images/mbox-question@2x.png")));
+
     msg->setWindowTitle(tr("Stream from MEGA"));
     msg->setText(tr("Are you sure that you want to stop the streaming?"));
     msg->addButton(QMessageBox::Yes);
@@ -209,8 +213,9 @@ void StreamingFromMegaDialog::on_bOpenOther_clicked()
     defaultPath = QDir::toNativeSeparators(defaultPath);
     MegaApi::log(MegaApi::LOG_LEVEL_DEBUG, QString::fromUtf8("Result: %1").arg(defaultPath).toUtf8().constData());
 
-    QString path =  QFileDialog::getOpenFileName(0, tr("Choose application"), defaultPath);
-    if (path.length() && !streamURL.isEmpty())
+    QPointer<StreamingFromMegaDialog> dialog(this);
+    QString path = QDir::toNativeSeparators(QFileDialog::getOpenFileName(0, tr("Choose application"), defaultPath));
+    if (dialog && path.length() && !streamURL.isEmpty())
     {
         QFileInfo info(path);
         if (!info.exists())
@@ -273,7 +278,7 @@ void StreamingFromMegaDialog::openStreamWithApp(QString app)
     QProcess::startDetached(command);
 #else
     QString args;
-    args = QLatin1String("-a ");
+    args = QString::fromUtf8("-a ");
     args += QDir::toNativeSeparators(QString::fromUtf8("\"")+ app + QString::fromUtf8("\"")) + QString::fromAscii(" \"%1\"").arg(streamURL);
     QProcess::startDetached(QString::fromAscii("open ") + args);
 #endif

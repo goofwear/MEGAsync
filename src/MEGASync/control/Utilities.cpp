@@ -223,6 +223,15 @@ void Utilities::getFolderSize(QString folderPath, long long *size)
     }
 }
 
+qreal Utilities::getDevicePixelRatio()
+{
+#if QT_VERSION >= 0x050000
+    return qApp->testAttribute(Qt::AA_UseHighDpiPixmaps) ? qApp->devicePixelRatio() : 1.0;
+#else
+    return 1.0;
+#endif
+}
+
 QString Utilities::getExtensionPixmap(QString fileName, QString prefix)
 {
     if (extensionIcons.isEmpty())
@@ -271,7 +280,7 @@ QString Utilities::languageCodeToString(QString code)
         languageNames[QString::fromAscii("ru")] = QString::fromUtf8("Pусский");
         languageNames[QString::fromAscii("sk")] = QString::fromUtf8("Slovenský");
         languageNames[QString::fromAscii("sl")] = QString::fromUtf8("Slovenščina");
-        languageNames[QString::fromAscii("sr")] = QString::fromUtf8("Serbian");
+        languageNames[QString::fromAscii("sr")] = QString::fromUtf8("српски");
         languageNames[QString::fromAscii("sv")] = QString::fromUtf8("Svenska");
         languageNames[QString::fromAscii("th")] = QString::fromUtf8("ภาษาไทย");
         languageNames[QString::fromAscii("tl")] = QString::fromUtf8("Tagalog");
@@ -283,20 +292,20 @@ QString Utilities::languageCodeToString(QString code)
 
 
         // Currently unsupported
-        languageNames[QString::fromAscii("mi")] = QString::fromUtf8("Māori");
-        languageNames[QString::fromAscii("ca")] = QString::fromUtf8("Català");
-        languageNames[QString::fromAscii("eu")] = QString::fromUtf8("Euskara");
-        languageNames[QString::fromAscii("af")] = QString::fromUtf8("Afrikaans");
-        languageNames[QString::fromAscii("no")] = QString::fromUtf8("Norsk");
-        languageNames[QString::fromAscii("bs")] = QString::fromUtf8("Bosanski");
-        languageNames[QString::fromAscii("da")] = QString::fromUtf8("Dansk");
-        languageNames[QString::fromAscii("el")] = QString::fromUtf8("ελληνικά");
-        languageNames[QString::fromAscii("lt")] = QString::fromUtf8("Lietuvos");
-        languageNames[QString::fromAscii("lv")] = QString::fromUtf8("Latviešu");
-        languageNames[QString::fromAscii("mk")] = QString::fromUtf8("македонски");
-        languageNames[QString::fromAscii("hi")] = QString::fromUtf8("हिंदी");
-        languageNames[QString::fromAscii("ms")] = QString::fromUtf8("Bahasa Malaysia");
-        languageNames[QString::fromAscii("cy")] = QString::fromUtf8("Cymraeg");
+        // languageNames[QString::fromAscii("mi")] = QString::fromUtf8("Māori");
+        // languageNames[QString::fromAscii("ca")] = QString::fromUtf8("Català");
+        // languageNames[QString::fromAscii("eu")] = QString::fromUtf8("Euskara");
+        // languageNames[QString::fromAscii("af")] = QString::fromUtf8("Afrikaans");
+        // languageNames[QString::fromAscii("no")] = QString::fromUtf8("Norsk");
+        // languageNames[QString::fromAscii("bs")] = QString::fromUtf8("Bosanski");
+        // languageNames[QString::fromAscii("da")] = QString::fromUtf8("Dansk");
+        // languageNames[QString::fromAscii("el")] = QString::fromUtf8("ελληνικά");
+        // languageNames[QString::fromAscii("lt")] = QString::fromUtf8("Lietuvos");
+        // languageNames[QString::fromAscii("lv")] = QString::fromUtf8("Latviešu");
+        // languageNames[QString::fromAscii("mk")] = QString::fromUtf8("македонски");
+        // languageNames[QString::fromAscii("hi")] = QString::fromUtf8("हिंदी");
+        // languageNames[QString::fromAscii("ms")] = QString::fromUtf8("Bahasa Malaysia");
+        // languageNames[QString::fromAscii("cy")] = QString::fromUtf8("Cymraeg");
     }
     return languageNames.value(code);
 }
@@ -393,7 +402,7 @@ bool Utilities::verifySyncedFolderLimits(QString path)
     }
     return true;
 }
-QString Utilities::getTimeString(long long secs)
+QString Utilities::getTimeString(long long secs, bool secondPrecision)
 {
     int seconds = (int) secs % 60;
     int minutes = (int) ((secs / 60) % 60);
@@ -406,32 +415,38 @@ QString Utilities::getTimeString(long long secs)
     if (days)
     {
         items++;
-        time.append(QString::fromUtf8("%1 <span style=\"color:#777777; text-decoration:none;\">d </span>").arg(days));
+        time.append(QString::fromUtf8(" %1 <span style=\"color:#777777; text-decoration:none;\">d</span>").arg(days));
     }
 
     if (items || hours)
     {
         items++;
-        time.append(QString::fromUtf8("%1 <span style=\"color:#777777; text-decoration:none;\">h </span>").arg(hours));
+        time.append(QString::fromUtf8(" %1 <span style=\"color:#777777; text-decoration:none;\">h</span>").arg(hours));
     }
 
     if (items == 2)
     {
+        time = time.trimmed();
         return time;
     }
 
     if (items || minutes)
     {
         items++;
-        time.append(QString::fromUtf8("%1 <span style=\"color:#777777; text-decoration:none;\">m </span>").arg(minutes));
+        time.append(QString::fromUtf8(" %1 <span style=\"color:#777777; text-decoration:none;\">m</span>").arg(minutes));
     }
 
     if (items == 2)
     {
+        time = time.trimmed();
         return time;
     }
 
-    time.append(QString::fromUtf8("%1 <span style=\"color:#777777; text-decoration:none;\">s </span>").arg(seconds));
+    if (secondPrecision)
+    {
+        time.append(QString::fromUtf8(" %1 <span style=\"color:#777777; text-decoration:none;\">s</span>").arg(seconds));
+    }
+    time = time.trimmed();
     return time;
 }
 

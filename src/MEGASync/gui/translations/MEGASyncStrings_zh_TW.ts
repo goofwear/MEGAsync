@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.0" language="zh_TW" sourcelanguage="en">
+<TS version="2.1" language="zh_TW" sourcelanguage="en">
 <context>
     <name>AccountDetailsDialog</name>
     <message>
@@ -52,6 +52,54 @@
         <source>Loading...</source>
         <translatorcomment>Label to show when an account detail request is waiting for the server response.</translatorcomment>
         <translation type="unfinished">讀取中</translation>
+    </message>
+</context>
+<context>
+    <name>ActiveTransfersWidget</name>
+    <message>
+        <source>No Transfers</source>
+        <translatorcomment>Label to indicate that there are no active transfers at current time</translatorcomment>
+        <translation type="unfinished">無傳輸/不傳輸</translation>
+    </message>
+    <message>
+        <source>Remaining Downloads</source>
+        <translatorcomment>Label to indicate the number of remaining downloads</translatorcomment>
+        <translation type="unfinished">剩餘的下載</translation>
+    </message>
+    <message>
+        <source>download speed</source>
+        <translatorcomment>Label to indicate the actual current download speed</translatorcomment>
+        <translation type="unfinished">下載速度</translation>
+    </message>
+    <message>
+        <source>No Downloads</source>
+        <translatorcomment>Label to indicate that there are no active downloads at current time</translatorcomment>
+        <translation type="unfinished">無下載/不下載</translation>
+    </message>
+    <message>
+        <source>Remaining Uploads</source>
+        <translatorcomment>Label to indicate the number of remaining uploads</translatorcomment>
+        <translation type="unfinished">剩餘的上傳</translation>
+    </message>
+    <message>
+        <source>upload speed</source>
+        <translatorcomment>Label to indicate the actual current upload speed</translatorcomment>
+        <translation type="unfinished">上傳速度</translation>
+    </message>
+    <message>
+        <source>No Uploads</source>
+        <translatorcomment>Label to indicate that there are no active uploads at current time</translatorcomment>
+        <translation type="unfinished">無上傳/不上傳</translation>
+    </message>
+    <message>
+        <source>PAUSED</source>
+        <translatorcomment>Label to indicate a global Pause state for all active transfers</translatorcomment>
+        <translation type="unfinished">暫停</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to cancel this transfer?</source>
+        <translatorcomment>Warning message shown when an user try to cancel the selected transfer</translatorcomment>
+        <translation type="unfinished">您確定要取消此筆傳輸嗎？</translation>
     </message>
 </context>
 <context>
@@ -371,6 +419,7 @@ we ask you to start with a smaller folder and add more data while MEGAsync is ru
     <name>ImportListWidgetItem</name>
     <message>
         <source>Please wait...</source>
+        <translatorcomment>Label to indicate the user that needs to wait until MEGAsync fetches link information from the server</translatorcomment>
         <translation type="unfinished">請等待...</translation>
     </message>
 </context>
@@ -592,6 +641,45 @@ Are you sure?</source>
         <source>Settings</source>
         <translation type="unfinished">設定</translation>
     </message>
+    <message>
+        <source>Resume downloads</source>
+        <translatorcomment>Label to resume the download queue. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">繼續下載</translation>
+    </message>
+    <message>
+        <source>Pause downloads</source>
+        <translatorcomment>Label to pause the download queue. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">暫停下載</translation>
+    </message>
+    <message>
+        <source>Resume uploads</source>
+        <translatorcomment>Label to resume the upload queue. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">繼續上傳</translation>
+    </message>
+    <message>
+        <source>Pause uploads</source>
+        <translatorcomment>Label to pause the upload queue. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">暫停上傳</translation>
+    </message>
+    <message>
+        <source>Resume download</source>
+        <translatorcomment>Label to resume the current download. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">繼續下載</translation>
+    </message>
+    <message>
+        <source>Resume upload</source>
+        <translatorcomment>Label to resume the current upload. (String as short as possible)</translatorcomment>
+        <translation type="unfinished">繼續上傳</translation>
+    </message>
+    <message>
+        <source>Blocked file: %1</source>
+        <translatorcomment>Label to show the blocked file that has stopped the synchronization engine</translatorcomment>
+        <translation type="unfinished">已阻擋檔案：%1</translation>
+    </message>
+    <message>
+        <source>Servers are too busy. Please wait...</source>
+        <translation type="unfinished">伺服器忙碌中。請稍候...</translation>
+    </message>
 </context>
 <context>
     <name>InfoOverQuotaDialog</name>
@@ -802,7 +890,7 @@ Exit anyway?</source>
     <message>
         <source>About</source>
         <translatorcomment>Label to indicate the About option for the application (MAX 20 characters)</translatorcomment>
-        <translation type="obsolete">關於</translation>
+        <translation type="unfinished">關於</translation>
     </message>
     <message>
         <source>Settings</source>
@@ -931,7 +1019,7 @@ https://mega.co.nz/#sync</source>
 
 Exit anyway?</source>
         <translatorcomment>Message displayed when a user is exiting the application while there are any active synchronization. Keep &quot;\n&quot; codes and capital letters.</translatorcomment>
-        <translation>同步將停止。還是退出?</translation>
+        <translation type="obsolete">同步將停止。還是退出?</translation>
     </message>
     <message>
         <source>Starting</source>
@@ -976,7 +1064,7 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
     <message>
         <source>Upload to MEGA</source>
         <translatorcomment>Label and title of the dialog displayed when a user wants to upload file/folder to MEGA. MAX 20 characters. Keep capital letters.</translatorcomment>
-        <translation>上傳至MEGA</translation>
+        <translation type="unfinished">上傳至MEGA</translation>
     </message>
     <message>
         <source>Show status</source>
@@ -991,7 +1079,7 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
     <message>
         <source>Download from MEGA</source>
         <translatorcomment>Label and title of the dialog displayed when a user wants to download file/folder from MEGA. MAX 20 characters. Keep capital letters.</translatorcomment>
-        <translation>從MEGA下載</translation>
+        <translation type="unfinished">從MEGA下載</translation>
     </message>
     <message>
         <source>Error getting link: </source>
@@ -1135,23 +1223,55 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
         <translation type="unfinished">您未登入</translation>
     </message>
     <message>
+        <source>Are you sure you want to exit?</source>
+        <translation type="unfinished">您確定要離開嗎？</translation>
+    </message>
+    <message>
+        <source>Transfer manager</source>
+        <translation type="unfinished">傳輸管理員</translation>
+    </message>
+    <message>
         <source>Could not find a system tray to place MEGAsync tray icon. MEGAsync is intended to be used with a system tray icon but it can work fine without it. If you want to open the interface, just try to open MEGAsync again.</source>
+        <translatorcomment>Message shown to the user to inform that MEGAsync is not able to find a systray to place tray icon</translatorcomment>
         <translation type="unfinished">找不到放置MEGAsync小圖示的系統工作列。MEGAsync可在系統工作列中出現圖示以使用，但它也可以在沒有小圖示的狀況下正常運作使用。如果要打開該界面，只需試著再次開啟MEGAsync。</translation>
-        <translatorcomment>Error message shown at startup when MEGAsync is executed in a Linux desktop that does not have a system tray</translatorcomment>
     </message>
     <message>
         <source>Error getting link:</source>
+        <translatorcomment>Notification message shown when an error occurs while getting a public link .</translatorcomment>
         <translation type="unfinished">生成鏈接出錯：</translation>
     </message>
     <message>
         <source>File not found</source>
-        <translatorcomment>Error message shown when the user tries to create a MEGA link for a file that is not in the Cloud Drive of the user</translatorcomment>
+        <translatorcomment>Notification message shown an error of file not found while getting a public link .</translatorcomment>
         <translation type="unfinished">未找到檔案</translation>
     </message>
     <message>
         <source>The link can&#039;t be generated because the file is in an incoming shared folder or in your Rubbish Bin</source>
-        <translatorcomment>Error message shown when the user tries to create a MEGA link for a file that can not be exported</translatorcomment>
+        <translatorcomment>Notification error message shown while generating a public link of a file from an incoming shared folder or from the rubbish bin</translatorcomment>
         <translation type="unfinished">無法生成連結，因為該檔案位於傳入的共享資料夾或垃圾桶中。</translation>
+    </message>
+    <message>
+        <source>Upload</source>
+        <translatorcomment>Label for the menu item that opens the dialog to upload files to MEGA</translatorcomment>
+        <translation type="unfinished">上傳</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translatorcomment>Label for the menu item that opens the dialog to download files from MEGA</translatorcomment>
+        <translation type="unfinished">下載</translation>
+    </message>
+    <message>
+        <source>You are syncing a local folder formatted with a FAT filesystem. That filesystem has deficiencies managing big files and modification times that can cause synchronization problems (e.g. when daylight saving changes), so it&#039;s strongly recommended that you only sync folders formatted with more reliable filesystems like NTFS (more information [A]here[/A]).</source>
+        <translatorcomment>Message shown to the user to inform whe he is trying to sync a folder formatted with FAT filesystem</translatorcomment>
+        <translation type="unfinished">您正在同步的本機資料夾是使用FAT檔案配置系統格式的。該檔案系統於管理大型檔案和修改時間時易產生缺陷，可能導致同步發生問題 (例如，在夏季日光節約時間調整更改時就很容易出錯)，因此強烈建議您只同步那些使用更可靠的檔案系統之資料夾，如NTFS系統 (若想瞭解更多資訊，請點[A]此處[/A])。</translation>
+    </message>
+    <message>
+        <source>Please consider updating your operating system.</source>
+        <translation type="unfinished">請考慮更新您的操作系統。</translation>
+    </message>
+    <message>
+        <source>MEGAsync will continue to work, however updates will no longer be supported for versions prior to OS X Mavericks soon.</source>
+        <translation type="unfinished">MEGAsync將繼續運作，但OS X Mavericks之前的版本將不再支援更新。</translation>
     </message>
 </context>
 <context>
@@ -1279,6 +1399,86 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
     <message>
         <source>Error</source>
         <translation type="obsolete">錯誤</translation>
+    </message>
+</context>
+<context>
+    <name>MegaTransferDelegate</name>
+    <message>
+        <source>Are you sure you want to cancel this transfer?</source>
+        <translatorcomment>Description label for warning dialog before a transfer cancellation</translatorcomment>
+        <translation type="unfinished">您確定要取消此筆傳輸嗎？</translation>
+    </message>
+    <message>
+        <source>paused</source>
+        <translatorcomment>Label to indicate that selected transfer is at paused state</translatorcomment>
+        <translation type="unfinished">已暫停</translation>
+    </message>
+</context>
+<context>
+    <name>MegaTransferView</name>
+    <message>
+        <source>Pause Transfer</source>
+        <translatorcomment>Label of context menu option to pause selected transfer</translatorcomment>
+        <translation type="unfinished">暫停傳輸</translation>
+    </message>
+    <message>
+        <source>Move to top</source>
+        <translatorcomment>Label of context menu option to move selected transfer to top of the list and give it highest priority</translatorcomment>
+        <translation type="unfinished">移至頂端</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translatorcomment>Label of context menu option to move selected transfer one step up of the list and give it more priority</translatorcomment>
+        <translation type="unfinished">上移</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translatorcomment>Label of context menu option to move selected transfer one step down of the list and give it less priority</translatorcomment>
+        <translation type="unfinished">下移</translation>
+    </message>
+    <message>
+        <source>Move to bottom</source>
+        <translatorcomment>Label of context menu option to move selected transfer to the bottom of the list and give it lowest priority</translatorcomment>
+        <translation type="unfinished">移至底端</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translatorcomment>Label of context menu option to cancel selected transfer</translatorcomment>
+        <translation type="unfinished">取消</translation>
+    </message>
+    <message>
+        <source>Get MEGA link</source>
+        <translatorcomment>Label of context menu option to generate a public link of selected completed transfer</translatorcomment>
+        <translation type="unfinished">取得MEGA連結</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translatorcomment>Label of context menu option to open selected completed transfer</translatorcomment>
+        <translation type="unfinished">開啟</translation>
+    </message>
+    <message>
+        <source>Show in folder</source>
+        <translatorcomment>Label of context menu option to open the selected completed transfer using the specific file browser</translatorcomment>
+        <translation type="unfinished">顯示資料夾</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translatorcomment>Label of context menu option to clear selected transfer item of completed view</translatorcomment>
+        <translation type="unfinished">清除</translation>
+    </message>
+    <message>
+        <source>Clear All</source>
+        <translatorcomment>Label of context menu option to clear all transfer items of completed view</translatorcomment>
+        <translation type="unfinished">全部清除</translation>
+    </message>
+    <message>
+        <source>Resume Transfer</source>
+        <translatorcomment>Label of context menu option to resume selected transfer</translatorcomment>
+        <translation type="unfinished">繼續傳輸</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to cancel this transfer?</source>
+        <translation type="unfinished">您確定要取消此筆傳輸嗎？</translation>
     </message>
 </context>
 <context>
@@ -1478,6 +1678,7 @@ Please, ensure that you don&#039;t use characters like &#039;\&#039; &#039;/&#03
     </message>
     <message>
         <source>Invalid MEGA Link</source>
+        <translatorcomment>Label to indicate that MEGA link processed is invalid/incorrect </translatorcomment>
         <translation type="unfinished">無效的 MEGA 連接</translation>
     </message>
 </context>
@@ -1520,7 +1721,7 @@ Please, ensure that you don&#039;t use characters like &#039;\&#039; &#039;/&#03
     </message>
     <message>
         <source>Owner permissions:</source>
-        <translatorcomment>Label just before the owner permissions that will be applied to new files and folders</translatorcomment>
+        <translatorcomment>Label just before the new owner permissions that will be applied to new files and folders</translatorcomment>
         <translation type="unfinished">擁有者權限：</translation>
     </message>
 </context>
@@ -1583,6 +1784,25 @@ Please, ensure that you don&#039;t use characters like &#039;\&#039; &#039;/&#03
         <source>&amp;Cancel</source>
         <translatorcomment>Label for cancel button. Keep capital letter.</translatorcomment>
         <translation>&amp;取消</translation>
+    </message>
+</context>
+<context>
+    <name>QPlatformTheme</name>
+    <message>
+        <source>&amp;Yes</source>
+        <translation type="unfinished">&amp;是</translation>
+    </message>
+    <message>
+        <source>&amp;No</source>
+        <translation type="unfinished">&amp;不</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation type="unfinished">OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">取消</translation>
     </message>
 </context>
 <context>
@@ -1944,7 +2164,7 @@ Please, ensure that you don&#039;t use characters like &#039;\&#039; &#039;/&#03
         <source>Enter a name to exclude from synchronization.
 (wildcards * and ? are allowed):</source>
         <translatorcomment>Label to let the user add a new excluded file name. Keep colon.</translatorcomment>
-        <translation>輸入一個需從同步排除的名字(允許特殊符號 * 與 ? ):</translation>
+        <translation>輸入一個需從同步排除的名字(允許特殊符號 * 與? ):</translation>
     </message>
     <message>
         <source>Error</source>
@@ -2156,11 +2376,6 @@ Do you want to restart MEGAsync now?</source>
         <translation type="unfinished">依檔案大小排除</translation>
     </message>
     <message>
-        <source>PRO lite</source>
-        <translatorcomment>Label to indicate that the current user has a PRO Iite account.</translatorcomment>
-        <translation type="unfinished">PRO LITE</translation>
-    </message>
-    <message>
         <source>The new excluded file names will be taken into account
 when the application starts again</source>
         <translatorcomment>Message displayed to inform the user that the new file name exclusion changes will be applied on next startup.</translatorcomment>
@@ -2177,24 +2392,9 @@ when the application starts again</source>
         <translation type="unfinished">停用</translation>
     </message>
     <message>
-        <source>Local cache: %1</source>
-        <translatorcomment>Label to indicate the user the total size of local cache. Keep %1 code, will be filled at runtime.</translatorcomment>
-        <translation type="unfinished">本機暫存: %1</translation>
-    </message>
-    <message>
-        <source>Remote cache: %1</source>
-        <translatorcomment>Label to indicate the user the total size of remote cache. Keep %1 code, will be filled at runtime.</translatorcomment>
-        <translation type="unfinished">遠端暫存: %1</translation>
-    </message>
-    <message>
         <source>Excluded file and folder names</source>
         <translatorcomment>Label to indicate the files and folders names exclude from the synchronization.</translatorcomment>
         <translation type="unfinished">不包括檔案與資料夾名稱</translation>
-    </message>
-    <message>
-        <source>Clear local cache</source>
-        <translatorcomment>Title of dialog to clear local cache for the current user.</translatorcomment>
-        <translation type="unfinished">清除本地快取暫存檔</translation>
     </message>
     <message>
         <source>Backups of the previous versions of your synced files in your computer will be permanently deleted. Please, check your backup folders to see if you need to rescue something before continuing:</source>
@@ -2202,24 +2402,9 @@ when the application starts again</source>
         <translation type="unfinished">在你電腦中已同步的檔案之備份版本將被永久刪除。請檢查您的備份資料夾，並確定在繼續進行此動作前，是否需要先備份或救回任何檔案。</translation>
     </message>
     <message>
-        <source>Do you want to delete your local cache now?</source>
-        <translatorcomment>Confirmation message before perform a deletion of local cache data</translatorcomment>
-        <translation type="unfinished">您想清除本地快取暫存檔嗎？</translation>
-    </message>
-    <message>
-        <source>Clear remote cache</source>
-        <translatorcomment>Title of dialog to clear remote cache for the current user.</translatorcomment>
-        <translation type="unfinished">清除遠程快取暫存檔</translation>
-    </message>
-    <message>
         <source>Backups of the previous versions of your synced files in MEGA will be permanently deleted. Please, check your [A] folder in the Rubbish Bin of your MEGA account to see if you need to rescue something before continuing.</source>
         <translatorcomment>Message shown to inform the user about the deletion of the remote cache and the consecuences</translatorcomment>
         <translation type="unfinished">在MEGA中已同步的檔案之備份版本將被永久刪除。請檢查您於MEGA帳戶之垃圾桶中的 [A] 資料夾，並確定在繼續進行此動作前，是否需要先備份或救回任何檔案。</translation>
-    </message>
-    <message>
-        <source>Do you want to delete your remote cache now?</source>
-        <translatorcomment>Confirmation message before perform a deletion of remote cache data</translatorcomment>
-        <translation type="unfinished">您想清除遠程快取暫存檔嗎？</translation>
     </message>
     <message>
         <source>Do you want to restart MEGAsync now?</source>
@@ -2239,6 +2424,59 @@ when the application starts again</source>
         <source>Enable this option only if your transfers don&#039;t start. In normal circumstances HTTP is satisfactory as all transfers are already encrypted.</source>
         <translatorcomment>Information message next to a checkbox that allows to disable the HTTP protocol for transfers.</translatorcomment>
         <translation type="unfinished">僅於您的傳輸未啟動時，才啟用此選項。正常情況下，HTTP已可為所有傳輸加密，且成果令人滿意。</translation>
+    </message>
+    <message>
+        <source>Local backup: %1</source>
+        <translation type="unfinished">本機備份：%1</translation>
+    </message>
+    <message>
+        <source>Remote backup: %1</source>
+        <translation type="unfinished">遠端備份：%1</translation>
+    </message>
+    <message>
+        <source>Clear local backup</source>
+        <translation type="unfinished">清除本機備份</translation>
+    </message>
+    <message>
+        <source>Do you want to delete your local backup now?</source>
+        <translation type="unfinished">您現在要刪除您的本機備份嗎？</translation>
+    </message>
+    <message>
+        <source>Clear remote backup</source>
+        <translation type="unfinished">清除遠端備份</translation>
+    </message>
+    <message>
+        <source>Do you want to delete your remote backup now?</source>
+        <translation type="unfinished">您現在要刪除您的遠端備份嗎？</translation>
+    </message>
+    <message>
+        <source>Download rate limit</source>
+        <translatorcomment>Label to indicate the actual bandwidth limit for downloads.</translatorcomment>
+        <translation type="unfinished">下載速率限制</translation>
+    </message>
+    <message>
+        <source>Number of parallel TCP connections per transfer:</source>
+        <translatorcomment>Label to indicate the actual number of parallel TCP connections used by MEGAsync. Keep colon.</translatorcomment>
+        <translation type="unfinished">每次傳輸的平行TCP連線數：</translation>
+    </message>
+    <message>
+        <source>Downloads</source>
+        <translatorcomment>Label to indicate the actual number of parallel TCP connections used for downloads</translatorcomment>
+        <translation type="unfinished">下載</translation>
+    </message>
+    <message>
+        <source>Uploads</source>
+        <translatorcomment>Label to indicate the actual number of parallel TCP connections used for uploads</translatorcomment>
+        <translation type="unfinished">上傳</translation>
+    </message>
+    <message>
+        <source>PRO Lite</source>
+        <translation type="unfinished">PRO LITE</translation>
+    </message>
+    <message>
+        <source>Don&#039;t show icons on the left pane of Windows Explorer</source>
+        <translatorcomment>Text next to a checkbox that allows to disable/enable the visualization of MEGAsync icons on the left pane of Windows Explorer</translatorcomment>
+        <translation type="unfinished">不要在Windows瀏覽器的左方面板上顯示圖示</translation>
     </message>
 </context>
 <context>
@@ -2608,6 +2846,11 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
         <source>You have attempted to log in too many times.[BR]Please wait until %1 and try again.</source>
         <translation type="unfinished">您於短時間內嘗試登入的次數過多。[BR] 請等待至 %1 後再重試。</translation>
     </message>
+    <message>
+        <source>When you finish this assistant, you will be able to sync additional folders using the settings dialog</source>
+        <translatorcomment>Label to inform the user about the possibility to add new synchronizations through settings dialog once the initial setup wizard is at final stage</translatorcomment>
+        <translation type="unfinished">結束此導覽後，您可使用設定記錄以同步其他資料夾。</translation>
+    </message>
 </context>
 <context>
     <name>ShellExtension</name>
@@ -2660,6 +2903,10 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
         <source>%1 (%2)</source>
         <translatorcomment>Keep %1 (%2) code because it will be filled with the number of folders at runtime. It will generate strings like: Upload to MEGA (5 files)</translatorcomment>
         <translation>%1 (%2)</translation>
+    </message>
+    <message>
+        <source>Remove from left pane</source>
+        <translation type="unfinished">從左側窗格中移除</translation>
     </message>
 </context>
 <context>
@@ -2799,18 +3046,199 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
     </message>
 </context>
 <context>
+    <name>TransferItem</name>
+    <message>
+        <source>paused</source>
+        <translatorcomment>Label to indicate a paused state for a transfer item (upload/download)</translatorcomment>
+        <translation type="unfinished">已暫停</translation>
+    </message>
+    <message>
+        <source>queued</source>
+        <translatorcomment>Label to indicate a queued state for a transfer item (upload/download)</translatorcomment>
+        <translation type="unfinished">已入排程</translation>
+    </message>
+    <message>
+        <source>retrying</source>
+        <translatorcomment>Label to indicate a state or retrying for a transfer item (upload/download)</translatorcomment>
+        <translation type="unfinished">正在重試</translation>
+    </message>
+    <message>
+        <source>completing</source>
+        <translatorcomment>Label to indicate a completing state for a transfer item (upload/download)</translatorcomment>
+        <translation type="unfinished">完成中</translation>
+    </message>
+    <message>
+        <source>just now</source>
+        <translation type="unfinished">正是現在</translation>
+    </message>
+    <message>
+        <source>%1 seconds ago</source>
+        <translation type="unfinished">%1 秒前</translation>
+    </message>
+    <message>
+        <source>1 minute ago</source>
+        <translation type="unfinished">1 分鐘前</translation>
+    </message>
+    <message>
+        <source>%1 minutes ago</source>
+        <translation type="unfinished">%1 分鐘前</translation>
+    </message>
+    <message>
+        <source>1 hour ago</source>
+        <translation type="unfinished">1 小時前</translation>
+    </message>
+    <message>
+        <source>%1 hours ago</source>
+        <translation type="unfinished">%1小時以前</translation>
+    </message>
+    <message>
+        <source>1 day ago</source>
+        <translation type="unfinished">1 天前</translation>
+    </message>
+    <message>
+        <source>%1 days ago</source>
+        <translation type="unfinished">%1 天前</translation>
+    </message>
+    <message>
+        <source>1 month ago</source>
+        <translation type="unfinished">1 個月前</translation>
+    </message>
+    <message>
+        <source>%1 months ago</source>
+        <translation type="unfinished">%1 個月前</translation>
+    </message>
+    <message>
+        <source>1 year ago</source>
+        <translation type="unfinished">1 年前</translation>
+    </message>
+    <message>
+        <source>%1 years ago</source>
+        <translation type="unfinished">%1 年前</translation>
+    </message>
+    <message>
+        <source>starting</source>
+        <translatorcomment>Label to indicate a state or starting for a transfer item (upload/download)</translatorcomment>
+        <translation type="unfinished">開始</translation>
+    </message>
+</context>
+<context>
+    <name>TransferManager</name>
+    <message>
+        <source>Transfer Manager</source>
+        <translatorcomment>Title of the dialog of Transfer Manager</translatorcomment>
+        <translation type="unfinished">傳輸管理員</translation>
+    </message>
+    <message>
+        <source>Add...</source>
+        <translatorcomment>Button label to add transfers items (uploads/downloads/public links) to the dialog (String as short as possible)</translatorcomment>
+        <translation type="unfinished">新增...</translation>
+    </message>
+    <message>
+        <source>Downloads</source>
+        <translatorcomment>Label of tab to access all active downloads</translatorcomment>
+        <translation type="unfinished">下載</translation>
+    </message>
+    <message>
+        <source>Uploads</source>
+        <translatorcomment>Label of tab to access all active uploads</translatorcomment>
+        <translation type="unfinished">上傳</translation>
+    </message>
+    <message>
+        <source>Completed</source>
+        <translatorcomment>Label of tab to access all completed transfers</translatorcomment>
+        <translation type="unfinished">完成</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translatorcomment>Button label to pause visible transfers</translatorcomment>
+        <translation type="unfinished">暫停</translation>
+    </message>
+    <message>
+        <source>Clear all</source>
+        <translatorcomment>Button label to clear all items of completed transfers view</translatorcomment>
+        <translation type="unfinished">全部清除</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translatorcomment>Button label to close transfer manager dialog</translatorcomment>
+        <translation type="unfinished">關閉</translation>
+    </message>
+    <message>
+        <source>Import links</source>
+        <translatorcomment>Label to indicate the Import link option from transfer manager dialog</translatorcomment>
+        <translation type="unfinished">匯入連結</translation>
+    </message>
+    <message>
+        <source>Upload to MEGA</source>
+        <translatorcomment>Label to indicate the file upload option from transfer manager dialog</translatorcomment>
+        <translation type="unfinished">上傳至MEGA</translation>
+    </message>
+    <message>
+        <source>Download from MEGA</source>
+        <translatorcomment>Label to indicate the file download option from transfer manager dialog</translatorcomment>
+        <translation type="unfinished">從MEGA下載</translation>
+    </message>
+    <message>
+        <source>Settings</source>
+        <translatorcomment>Label to indicate the Settings option for the application</translatorcomment>
+        <translation type="unfinished">設定</translation>
+    </message>
+    <message>
+        <source>Preferences</source>
+        <translatorcomment>Label to indicate the Preferences option for the application</translatorcomment>
+        <translation type="unfinished">偏好</translation>
+    </message>
+    <message>
+        <source>Cancel all</source>
+        <translatorcomment>Button label to cancel all items of active transfers view</translatorcomment>
+        <translation type="unfinished">全部取消</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to cancel all transfers?</source>
+        <translatorcomment>Description label for warning dialog before a transfer cancellation</translatorcomment>
+        <translation type="unfinished">您確定要取消全部傳輸嗎？</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation type="unfinished">恢復</translation>
+    </message>
+    <message>
+        <source>Active Transfers</source>
+        <translatorcomment>Label of tab to access all active transfers</translatorcomment>
+        <translation type="unfinished">進行中的傳輸</translation>
+    </message>
+</context>
+<context>
+    <name>TransfersStateInfoWidget</name>
+    <message>
+        <source>No Downloads</source>
+        <translatorcomment>Label to indicate that there are no active downloads</translatorcomment>
+        <translation type="unfinished">無下載/不下載</translation>
+    </message>
+    <message>
+        <source>No Uploads</source>
+        <translatorcomment>Label to indicate that there are no active uploads</translatorcomment>
+        <translation type="unfinished">無上傳/不上傳</translation>
+    </message>
+    <message>
+        <source>Paused Transfers</source>
+        <translatorcomment>Label to indicate that active transfers are paused</translatorcomment>
+        <translation type="unfinished">傳輸暫停</translation>
+    </message>
+</context>
+<context>
     <name>UpgradeDialog</name>
     <message>
         <source>Free bandwidth quota exceeded</source>
-        <translation type="unfinished">免費頻寬配額已用完</translation>
+        <translation type="unfinished">超過免費傳輸配額</translation>
     </message>
     <message>
         <source>Your download could not proceed because it would take you over the current free transfer allowance for your IP address. This limit is dynamic and depends on the amount of unused bandwidth we have available.</source>
-        <translation type="unfinished">您的下載未被繼續因為這將超過您現在IP位址的免費傳輸使用量。此限制為動態的，取決於我們現有的未使用頻寬量。</translation>
+        <translation type="unfinished">您的下載未能繼續，因為這將超過您現在IP位址的免費傳輸使用量。此限制為動態變化的，取決於我們現有的未使用頻寬量。</translation>
     </message>
     <message>
         <source>You have utilized %1 of data transfer in the last 6 hours, which took you over our current limit. To circumvent this limit, you can [A]upgrade to Pro[/A], which will give you your own bandwidth package and also ample extra storage space. </source>
-        <translation type="unfinished">您於過去六小時使用了%1數據傳輸，已超過了您的現有限制量。若要超越這個限制，我們建議您可[A]升級到Pro[/A]，將讓您有獨自的頻寬套裝方案並可享有更多充足的儲存空間。</translation>
+        <translation type="unfinished">您於過去六小時使用了%1數據傳輸，已超過了您的現有限制量。若要解除此限制，我們建議您可[A]升級為PRO專業版[/A]，將讓您有專屬的傳輸配額套裝方案，並可享有更充足的儲存空間。</translation>
     </message>
     <message>
         <source>Please upgrade to Pro to continue immediately, or wait %1 to continue for free. </source>
@@ -2847,7 +3275,7 @@ Please, try again. If the problem persists please contact bug@mega.co.nz</source
     <message>
         <source>MEGAsync Uploads</source>
         <translatorcomment>Label to indicate the default MEGA folder for file uploaded.</translatorcomment>
-        <translation>MEGAsync上傳</translation>
+        <translation type="obsolete">MEGAsync上傳</translation>
     </message>
     <message>
         <source>OK</source>

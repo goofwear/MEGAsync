@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QStringList>
+#include <QWidget>
 
 void setMacXActivationPolicy();
 QStringList qt_mac_NSArrayToQStringList(void *nsarray);
@@ -16,5 +17,6 @@ void removePathFromPlaces(QString path);
 void setFolderIcon(QString path);
 void unSetFolderIcon(QString path);
 QString defaultOpenApp(QString extension);
+void enableBlurForWindow(QWidget *window);
 
 #endif // MACXFUNCTIONS_H

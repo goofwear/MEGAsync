@@ -31,56 +31,50 @@ void MegaUploader::upload(QString path, MegaNode *parent)
 void MegaUploader::upload(QFileInfo info, MegaNode *parent)
 {
     QApplication::processEvents();
-
-    MegaNodeList *children =  megaApi->getChildren(parent);
-    QByteArray utf8name = info.fileName().toUtf8();
-    QString currentPath = QDir::toNativeSeparators(info.absoluteFilePath());
-    MegaNode *dupplicate = NULL;
-    for (int i = 0; i < children->size(); i++)
+    QString fileName = info.fileName();
+    if (fileName.isEmpty() && info.isRoot())
     {
-        MegaNode *child = children->get(i);
-        if (!strcmp(utf8name.constData(), child->getName())
-                && ((info.isDir() && (child->getType() == MegaNode::TYPE_FOLDER))
-                    || (info.isFile() && (child->getType() == MegaNode::TYPE_FILE)
-                        && (info.size() == child->getSize()))))
+        fileName = QDir::toNativeSeparators(info.absoluteFilePath())
+                .replace(QString::fromUtf8("\\"), QString::fromUtf8(""))
+                .replace(QString::fromUtf8("/"), QString::fromUtf8(""))
+                .replace(QString::fromUtf8(":"), QString::fromUtf8(""));
+
+        if (fileName.isEmpty())
         {
-            dupplicate = child->copy();
-            break;
+            fileName = QString::fromUtf8("Drive");
         }
     }
-    delete children;
 
-    if (dupplicate)
+    QByteArray utf8name = fileName.toUtf8();
+    QString currentPath = QDir::toNativeSeparators(info.absoluteFilePath());
+    if (info.isDir())
     {
-        if (dupplicate->getType() == MegaNode::TYPE_FILE)
-        {
-            emit dupplicateUpload(info.absoluteFilePath(), info.fileName(), dupplicate->getHandle());
-        }
-
-        if (dupplicate->getType() == MegaNode::TYPE_FOLDER)
+        MegaNode *child = megaApi->getChildNode(parent, utf8name.constData());
+        if (child && child->getType() == MegaNode::TYPE_FOLDER)
         {
             QDir dir(info.absoluteFilePath());
             QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);
             for (int i = 0; i < entries.size(); i++)
             {
-                upload(entries[i], dupplicate);
+                upload(entries[i], child);
             }
+            delete child;
+            return;
         }
-        delete dupplicate;
-        return;
+        delete child;
     }
 
     string localPath = megaApi->getLocalPath(parent);
-    if (localPath.size() && megaApi->isSyncable(info.fileName().toUtf8().constData()))
+    if (localPath.size() && megaApi->isSyncable(utf8name.constData()))
     {
 #ifdef WIN32
-        QString destPath = QDir::toNativeSeparators(QString::fromWCharArray((const wchar_t *)localPath.data()) + QDir::separator() + info.fileName());
+        QString destPath = QDir::toNativeSeparators(QString::fromWCharArray((const wchar_t *)localPath.data()) + QDir::separator() + fileName);
         if (destPath.startsWith(QString::fromAscii("\\\\?\\")))
         {
             destPath = destPath.mid(4);
         }
 #else
-        QString destPath = QDir::toNativeSeparators(QString::fromUtf8(localPath.data()) + QDir::separator() + info.fileName());
+        QString destPath = QDir::toNativeSeparators(QString::fromUtf8(localPath.data()) + QDir::separator() + fileName);
 #endif
         megaApi->moveToLocalDebris(destPath.toUtf8().constData());
         QtConcurrent::run(Utilities::copyRecursively, currentPath, destPath);
@@ -92,7 +86,7 @@ void MegaUploader::upload(QFileInfo info, MegaNode *parent)
     else if (info.isDir())
     {
         folders.enqueue(info);
-        megaApi->createFolder(info.fileName().toUtf8().constData(), parent, delegateListener);
+        megaApi->createFolder(utf8name.constData(), parent, delegateListener);
     }
 }
 

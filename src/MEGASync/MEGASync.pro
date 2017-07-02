@@ -102,6 +102,12 @@ TRANSLATIONS = \
 CODECFORTR = UTF8
 
 win32 {
+    greaterThan(QT_MAJOR_VERSION, 4) {
+        greaterThan(QT_MINOR_VERSION, 1) {
+            QT += winextras
+        }
+    }
+
     RC_FILE = icon.rc
     QMAKE_LFLAGS += /LARGEADDRESSAWARE
     QMAKE_LFLAGS_WINDOWS += /SUBSYSTEM:WINDOWS,5.01
@@ -121,6 +127,10 @@ macx {
 
     QMAKE_INFO_PLIST = Info_MEGA.plist
 
+    QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.6
+    QMAKE_CXXFLAGS -= -stdlib=libc++
+    QMAKE_LFLAGS -= -stdlib=libc++
+    CONFIG -= c++11
     QMAKE_CXXFLAGS += -fvisibility=hidden -fvisibility-inlines-hidden
     QMAKE_LFLAGS += -F /System/Library/Frameworks/Security.framework/
 }

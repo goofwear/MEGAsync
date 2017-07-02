@@ -2,6 +2,7 @@
 #include "gui/CrashReportDialog.h"
 #include "gui/MegaProxyStyle.h"
 #include "gui/ConfirmSSLexception.h"
+#include "gui/QMegaMessageBox.h"
 #include "control/Utilities.h"
 #include "control/CrashHandler.h"
 #include "control/ExportProcessor.h"
@@ -13,6 +14,7 @@
 #include <QDesktopWidget>
 #include <QFontDatabase>
 #include <QNetworkProxy>
+#include <assert.h>
 
 #if QT_VERSION >= 0x050000
 #include <QtConcurrent/QtConcurrent>
@@ -141,9 +143,11 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_LINUX
-
-
 #if QT_VERSION >= 0x050600
+    if (getenv("XDG_CURRENT_DESKTOP") && !strcmp(getenv("XDG_CURRENT_DESKTOP"),"KDE"))
+    {
+        qputenv("XDG_CURRENT_DESKTOP","OVERRIDEN");
+    }
     if (!getenv("QT_SCALE_FACTOR"))
     {
         MegaApplication appaux(argc,argv); //needed to get geometry (it needs to be instantiated a second time to actually use scale factor)
@@ -205,7 +209,9 @@ int main(int argc, char *argv[])
                 preferences->enterUser(i);
                 for (int j = 0; j < preferences->getNumSyncedFolders(); j++)
                 {
-                    Platform::syncFolderRemoved(preferences->getLocalFolder(j), preferences->getSyncName(j));
+                    Platform::syncFolderRemoved(preferences->getLocalFolder(j),
+                                                preferences->getSyncName(j),
+                                                preferences->getSyncID(j));
 
                     #ifdef WIN32
                         QString debrisPath = QDir::toNativeSeparators(preferences->getLocalFolder(j) +
@@ -235,6 +241,7 @@ int main(int argc, char *argv[])
         }
 
         Utilities::removeRecursively(MegaApplication::applicationDataPath());
+        Platform::uninstall();
 
 #ifdef WIN32
         if (preferences->installationTime() != -1)
@@ -279,12 +286,31 @@ int main(int argc, char *argv[])
                  fappShowInterfacePath.close();
              }
         }
+#ifdef __APPLE__
+        else if (i == 5)
+        {
+            QString appVersionPath = dataDir.filePath(QString::fromAscii("megasync.version"));
+            QFile fappVersionPath(appVersionPath);
+            if (!fappVersionPath.exists())
+            {
+                QProcess::startDetached(QString::fromUtf8("/bin/bash -c \"lsof ~/Library/Application\\ Support/Mega\\ Limited/MEGAsync/megasync.lock 2>/dev/null | grep MEGAclien | cut -d' ' -f2 | xargs kill\""));
+            }
+        }
+#endif
 
         #ifdef WIN32
             Sleep(1000);
         #else
             sleep(1);
         #endif
+    }
+
+    QString appVersionPath = dataDir.filePath(QString::fromAscii("megasync.version"));
+    QFile fappVersionPath(appVersionPath);
+    if (fappVersionPath.open(QIODevice::WriteOnly))
+    {
+        fappVersionPath.write(QString::number(Preferences::VERSION_CODE).toUtf8());
+        fappVersionPath.close();
     }
 
     if (alreadyStarted)
@@ -302,6 +328,10 @@ int main(int argc, char *argv[])
     QFont font(QString::fromAscii("Open Sans"), 8);
     app.setFont(font);
 #endif
+    QFontDatabase::addApplicationFont(QString::fromAscii("://fonts/SourceSansPro-Light.ttf"));
+    QFontDatabase::addApplicationFont(QString::fromAscii("://fonts/SourceSansPro-Bold.ttf"));
+    QFontDatabase::addApplicationFont(QString::fromAscii("://fonts/SourceSansPro-Regular.ttf"));
+    QFontDatabase::addApplicationFont(QString::fromAscii("://fonts/SourceSansPro-Semibold.ttf"));
 #endif
 
     app.initialize();
@@ -313,6 +343,10 @@ int main(int argc, char *argv[])
     QT_TRANSLATE_NOOP("QDialogButtonBox", "&No");
     QT_TRANSLATE_NOOP("QDialogButtonBox", "&OK");
     QT_TRANSLATE_NOOP("QDialogButtonBox", "&Cancel");
+    QT_TRANSLATE_NOOP("QPlatformTheme", "&Yes");
+    QT_TRANSLATE_NOOP("QPlatformTheme", "&No");
+    QT_TRANSLATE_NOOP("QPlatformTheme", "OK");
+    QT_TRANSLATE_NOOP("QPlatformTheme", "Cancel"):
     QT_TRANSLATE_NOOP("Installer", "Choose Users");
     QT_TRANSLATE_NOOP("Installer", "Choose for which users you want to install $(^NameDA).");
     QT_TRANSLATE_NOOP("Installer", "Select whether you want to install $(^NameDA) for yourself only or for all users of this computer. $(^ClickNext)");
@@ -350,7 +384,7 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
     QApplication(argc, argv)
 {
     appfinished = false;
-    logger = new MegaSyncLogger();
+    logger = new MegaSyncLogger(this);
 
     #if defined(LOG_TO_STDOUT) || defined(LOG_TO_FILE) || defined(LOG_TO_LOGGER)
     #if defined(LOG_TO_STDOUT)
@@ -426,8 +460,12 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
 
     updateAvailable = false;
     networkConnectivity = true;
-    lastStartedDownload = 0;
-    lastStartedUpload = 0;
+    activeTransferPriority[MegaTransfer::TYPE_DOWNLOAD] = 0xFFFFFFFFFFFFFFFFULL;
+    activeTransferPriority[MegaTransfer::TYPE_UPLOAD] = 0xFFFFFFFFFFFFFFFFULL;
+    activeTransferState[MegaTransfer::TYPE_DOWNLOAD] = MegaTransfer::STATE_NONE;
+    activeTransferState[MegaTransfer::TYPE_UPLOAD] = MegaTransfer::STATE_NONE;
+    activeTransferTag[MegaTransfer::TYPE_DOWNLOAD] = 0;
+    activeTransferTag[MegaTransfer::TYPE_UPLOAD] = 0;
     trayIcon = NULL;
     trayMenu = NULL;
     trayOverQuotaMenu = NULL;
@@ -436,9 +474,8 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
     megaApiFolders = NULL;
     delegateListener = NULL;
     httpServer = NULL;
-    totalDownloadSize = totalUploadSize = 0;
-    totalDownloadedSize = totalUploadedSize = 0;
-    uploadSpeed = downloadSpeed = 0;
+    numTransfers[MegaTransfer::TYPE_DOWNLOAD] = 0;
+    numTransfers[MegaTransfer::TYPE_UPLOAD] = 0;
     exportOps = 0;
     infoDialog = NULL;
     infoOverQuota = NULL;
@@ -446,7 +483,6 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
     settingsDialog = NULL;
     streamSelector = NULL;
     reboot = false;
-    translator = NULL;
     exitAction = NULL;
     exitActionOverquota = NULL;
     exitActionGuest = NULL;
@@ -459,6 +495,13 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
 #ifdef _WIN32
     windowsMenu = NULL;
     windowsExitAction = NULL;
+    windowsUpdateAction = NULL;
+    windowsImportLinksAction = NULL;
+    windowsUploadAction = NULL;
+    windowsDownloadAction = NULL;
+    windowsStreamAction = NULL;
+    windowsTransferManagerAction = NULL;
+    windowsSettingsAction = NULL;
 #endif
     changeProxyAction = NULL;
     initialExitAction = NULL;
@@ -498,8 +541,12 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
     noKeyDetected = 0;
     isFirstSyncDone = false;
     isFirstFileSynced = false;
+    transferManager = NULL;
     queuedUserStats = 0;
     maxMemoryUsage = 0;
+    nUnviewedTransfers = 0;
+    completedTabActive = false;
+    prevVersion = 0;
 
 #ifdef __APPLE__
     scanningTimer = NULL;
@@ -508,7 +555,11 @@ MegaApplication::MegaApplication(int &argc, char **argv) :
 
 MegaApplication::~MegaApplication()
 {
-
+    if (!translator.isEmpty())
+    {
+        removeTranslator(&translator);
+    }
+    delete pricing;
 }
 
 void MegaApplication::showInterface(QString)
@@ -547,40 +598,25 @@ void MegaApplication::initialize()
 
     preferences = Preferences::instance();
     connect(preferences, SIGNAL(stateChanged()), this, SLOT(changeState()));
-    connect(preferences, SIGNAL(updated()), this, SLOT(showUpdatedMessage()));
+    connect(preferences, SIGNAL(updated(int)), this, SLOT(showUpdatedMessage(int)));
     preferences->initialize(dataPath);
     if (preferences->error())
     {
-        QMessageBox::critical(NULL, QString::fromAscii("MEGAsync"), tr("Your config is corrupt, please start over"));
+        QMegaMessageBox::critical(NULL, QString::fromAscii("MEGAsync"), tr("Your config is corrupt, please start over"), Utilities::getDevicePixelRatio());
     }
 
     preferences->setLastStatsRequest(0);
     lastExit = preferences->getLastExit();
 
-    QString basePath = QDir::toNativeSeparators(dataPath + QString::fromAscii("/"));
-
-#ifdef WIN32
-    //Backwards compatibility code
-    QDirIterator di(dataPath, QDir::Files | QDir::NoDotAndDotDot);
-    while (di.hasNext())
-    {
-        di.next();
-        const QFileInfo& fi = di.fileInfo();
-        if (fi.fileName().startsWith(QString::fromAscii(".tmp.")))
-        {
-            QFile::remove(di.filePath());
-        }
-    }
-#endif
-
+    installTranslator(&translator);
     QString language = preferences->language();
     changeLanguage(language);
     trayIcon->show();
 
 #ifdef __APPLE__
-    notificator = new Notificator(applicationName(), NULL, NULL);
+    notificator = new Notificator(applicationName(), NULL, this);
 #else
-    notificator = new Notificator(applicationName(), trayIcon, NULL);
+    notificator = new Notificator(applicationName(), trayIcon, this);
 #endif
 
     Qt::KeyboardModifiers modifiers = queryKeyboardModifiers();
@@ -590,19 +626,33 @@ void MegaApplication::initialize()
         toggleLogging();
     }
 
+    QString basePath = QDir::toNativeSeparators(dataPath + QString::fromAscii("/"));
 #ifndef __APPLE__
     megaApi = new MegaApi(Preferences::CLIENT_KEY, basePath.toUtf8().constData(), Preferences::USER_AGENT);
-    megaApiFolders = new MegaApi(Preferences::CLIENT_KEY, basePath.toUtf8().constData(), Preferences::USER_AGENT);
 #else
     megaApi = new MegaApi(Preferences::CLIENT_KEY, basePath.toUtf8().constData(), Preferences::USER_AGENT, MacXPlatform::fd);
-    megaApiFolders = new MegaApi(Preferences::CLIENT_KEY, basePath.toUtf8().constData(), Preferences::USER_AGENT, MacXPlatform::fd);
 #endif
 
+    megaApiFolders = new MegaApi(Preferences::CLIENT_KEY, basePath.toUtf8().constData(), Preferences::USER_AGENT);
     megaApi->log(MegaApi::LOG_LEVEL_INFO, QString::fromUtf8("MEGAsync is starting. Version string: %1   Version code: %2.%3   User-Agent: %4").arg(Preferences::VERSION_STRING)
              .arg(Preferences::VERSION_CODE).arg(Preferences::BUILD_ID).arg(QString::fromUtf8(megaApi->getUserAgent())).toUtf8().constData());
 
+    QString languageCode = language;
+    while (languageCode.size() && !Utilities::languageCodeToString(languageCode).size())
+    {
+        languageCode.resize(languageCode.size() - 1);
+    }
+
+    if (languageCode.size())
+    {
+        megaApi->setLanguage(languageCode.toUtf8().constData());
+        megaApiFolders->setLanguage(languageCode.toUtf8().constData());
+    }
+
     megaApi->setDownloadMethod(preferences->transferDownloadMethod());
     megaApi->setUploadMethod(preferences->transferUploadMethod());
+    setMaxConnections(MegaTransfer::TYPE_UPLOAD,   preferences->parallelUploadConnections());
+    setMaxConnections(MegaTransfer::TYPE_DOWNLOAD, preferences->parallelDownloadConnections());
     setUseHttpsOnly(preferences->usingHttpsOnly());
 
     megaApi->setDefaultFilePermissions(preferences->filePermissionsValue());
@@ -610,25 +660,15 @@ void MegaApplication::initialize()
     megaApi->retrySSLerrors(true);
     megaApi->setPublicKeyPinning(!preferences->SSLcertificateException());
 
-    delegateListener = new MEGASyncDelegateListener(megaApi, this);
+    delegateListener = new MEGASyncDelegateListener(megaApi, this, this);
     megaApi->addListener(delegateListener);
     uploader = new MegaUploader(megaApi);
     downloader = new MegaDownloader(megaApi);
-
-    //Start the HTTP server
-    httpServer = new HTTPServer(megaApi, Preferences::HTTPS_PORT, true);
-    connect(httpServer, SIGNAL(onLinkReceived(QString, QString)), this, SLOT(externalDownload(QString, QString)), Qt::QueuedConnection);
-    connect(httpServer, SIGNAL(onExternalDownloadRequested(QQueue<mega::MegaNode *>)), this, SLOT(externalDownload(QQueue<mega::MegaNode *>)));
-    connect(httpServer, SIGNAL(onExternalDownloadRequestFinished()), this, SLOT(processDownloads()), Qt::QueuedConnection);
-    connect(httpServer, SIGNAL(onSyncRequested(long long)), this, SLOT(syncFolder(long long)), Qt::QueuedConnection);
 
     connectivityTimer = new QTimer(this);
     connectivityTimer->setSingleShot(true);
     connectivityTimer->setInterval(Preferences::MAX_LOGIN_TIME_MS);
     connect(connectivityTimer, SIGNAL(timeout()), this, SLOT(runConnectivityCheck()));
-
-    connect(uploader, SIGNAL(dupplicateUpload(QString, QString, mega::MegaHandle)), this, SLOT(onDupplicateTransfer(QString, QString, mega::MegaHandle)));
-    connect(downloader, SIGNAL(dupplicateDownload(QString, QString, mega::MegaHandle)), this, SLOT(onDupplicateTransfer(QString, QString, mega::MegaHandle)));
 
     if (preferences->isCrashed())
     {
@@ -655,28 +695,33 @@ void MegaApplication::initialize()
                 applyProxySettings();
                 CrashHandler::instance()->sendPendingCrashReports(crashDialog.getUserMessage());
 #ifndef __APPLE__
-                QMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("Thank you for your collaboration!"));
+                QMegaMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("Thank you for your collaboration!"), Utilities::getDevicePixelRatio());
 #endif
             }
         }
     }
 
-    periodicTasksTimer = new QTimer();
+    periodicTasksTimer = new QTimer(this);
     periodicTasksTimer->start(Preferences::STATE_REFRESH_INTERVAL_MS);
     connect(periodicTasksTimer, SIGNAL(timeout()), this, SLOT(periodicTasks()));
 
-    infoDialogTimer = new QTimer();
+    infoDialogTimer = new QTimer(this);
     infoDialogTimer->setSingleShot(true);
     connect(infoDialogTimer, SIGNAL(timeout()), this, SLOT(showInfoDialog()));
 
+    firstTransferTimer = new QTimer(this);
+    firstTransferTimer->setSingleShot(true);
+    firstTransferTimer->setInterval(200);
+    connect(firstTransferTimer, SIGNAL(timeout()), this, SLOT(checkFirstTransfer()));
+
     connect(this, SIGNAL(aboutToQuit()), this, SLOT(cleanAll()));
 
-    if (preferences->logged() && preferences->wasPaused())
+    if (preferences->logged() && preferences->getGlobalPaused())
     {
         pauseTransfers(true);
     }
 
-    QDir dataDir(applicationDataPath());
+    QDir dataDir(dataPath);
     if (dataDir.exists())
     {
         QString appShowInterfacePath = dataDir.filePath(QString::fromAscii("megasync.show"));
@@ -713,27 +758,44 @@ void MegaApplication::changeLanguage(QString languageCode)
         return;
     }
 
-    if (translator)
-    {
-        removeTranslator(translator);
-        delete translator;
-        translator = NULL;
-    }
-
-    QTranslator *newTranslator = new QTranslator();
-    if (newTranslator->load(Preferences::TRANSLATION_FOLDER
+    if (!translator.load(Preferences::TRANSLATION_FOLDER
                             + Preferences::TRANSLATION_PREFIX
-                            + languageCode)
-            || newTranslator->load(Preferences::TRANSLATION_FOLDER
+                            + languageCode))
+    {
+        if (translator.load(Preferences::TRANSLATION_FOLDER
                                    + Preferences::TRANSLATION_PREFIX
                                    + QString::fromUtf8("en")))
-    {
-        installTranslator(newTranslator);
-        translator = newTranslator;
+        {
+            if (megaApi)
+            {
+                megaApi->setLanguage("en");
+            }
+
+            if (megaApiFolders)
+            {
+                megaApiFolders->setLanguage("en");
+            }
+        }
     }
     else
-    {
-        delete newTranslator;
+    {        
+        while (languageCode.size() && !Utilities::languageCodeToString(languageCode).size())
+        {
+            languageCode.resize(languageCode.size() - 1);
+        }
+
+        if (languageCode.size())
+        {
+            if (megaApi)
+            {
+                megaApi->setLanguage(languageCode.toUtf8().constData());
+            }
+
+            if (megaApiFolders)
+            {
+                megaApiFolders->setLanguage(languageCode.toUtf8().constData());
+            }
+        }
     }
 
     createTrayIcon();
@@ -741,12 +803,7 @@ void MegaApplication::changeLanguage(QString languageCode)
 
 void MegaApplication::updateTrayIcon()
 {
-    if (appfinished)
-    {
-        return;
-    }
-
-    if (!trayIcon)
+    if (appfinished || !trayIcon)
     {
         return;
     }
@@ -1090,6 +1147,7 @@ void MegaApplication::start()
         QString language = preferences->language();
         changeLanguage(language);
 
+        initHttpsServer();
         if (updated)
         {
             megaApi->sendEvent(99510, "MEGAsync update");
@@ -1102,10 +1160,14 @@ void MegaApplication::start()
             infoDialog = new InfoDialog(this);
             if (!QSystemTrayIcon::isSystemTrayAvailable())
             {
-                QMessageBox::warning(NULL, tr("MEGAsync"),
-                                     tr("Could not find a system tray to place MEGAsync tray icon. "
-                                        "MEGAsync is intended to be used with a system tray icon but it can work fine without it. "
-                                        "If you want to open the interface, just try to open MEGAsync again."));
+                if (!preferences->isOneTimeActionDone(Preferences::ONE_TIME_ACTION_NO_SYSTRAY_AVAILABLE))
+                {
+                    QMessageBox::warning(NULL, tr("MEGAsync"),
+                                         tr("Could not find a system tray to place MEGAsync tray icon. "
+                                            "MEGAsync is intended to be used with a system tray icon but it can work fine without it. "
+                                            "If you want to open the interface, just try to open MEGAsync again."));
+                    preferences->setOneTimeActionDone(Preferences::ONE_TIME_ACTION_NO_SYSTRAY_AVAILABLE, true);
+                }
             }
         }
 
@@ -1158,6 +1220,7 @@ void MegaApplication::start()
                        preferences->privatePw().toUtf8().constData());
         }
 
+        initHttpsServer();
         if (updated)
         {
             megaApi->sendEvent(99510, "MEGAsync update");
@@ -1230,6 +1293,8 @@ void MegaApplication::loggedIn()
 #endif
 
     preferences->setLastExecutionTime(QDateTime::currentDateTime().toMSecsSinceEpoch());
+    QDateTime now = QDateTime::currentDateTime();
+    preferences->setDsDiffTimeWithSDK(now.toMSecsSinceEpoch() / 100 - megaApi->getSDKtime());
 
     startUpdateTask();
     QString language = preferences->language();
@@ -1248,7 +1313,22 @@ void MegaApplication::loggedIn()
     }
 
     //Set the upload limit
-    setUploadLimit(preferences->uploadLimitKB());
+    if (preferences->uploadLimitKB() > 0)
+    {
+        setUploadLimit(0);
+    }
+    else
+    {
+        setUploadLimit(preferences->uploadLimitKB());
+    }
+    setMaxUploadSpeed(preferences->uploadLimitKB());
+    setMaxDownloadSpeed(preferences->downloadLimitKB());
+    setMaxConnections(MegaTransfer::TYPE_UPLOAD,   preferences->parallelUploadConnections());
+    setMaxConnections(MegaTransfer::TYPE_DOWNLOAD, preferences->parallelDownloadConnections());
+    setUseHttpsOnly(preferences->usingHttpsOnly());
+
+    megaApi->setDefaultFilePermissions(preferences->filePermissionsValue());
+    megaApi->setDefaultFolderPermissions(preferences->folderPermissionsValue());
 
     // Process any pending download/upload queued during GuestMode
     processDownloads();
@@ -1380,7 +1460,9 @@ void MegaApplication::disableSyncs()
            continue;
        }
 
-       Platform::syncFolderRemoved(preferences->getLocalFolder(i), preferences->getSyncName(i));
+       Platform::syncFolderRemoved(preferences->getLocalFolder(i),
+                                   preferences->getSyncName(i),
+                                   preferences->getSyncID(i));
        Platform::notifyItemChange(preferences->getLocalFolder(i));
        preferences->setSyncState(i, false, true);
        MegaNode *node = megaApi->getNodeByHandle(preferences->getMegaFolderHandle(i));
@@ -1429,6 +1511,9 @@ void MegaApplication::restoreSyncs()
 
 void MegaApplication::closeDialogs()
 {
+    delete transferManager;
+    transferManager = NULL;
+
     delete setupWizard;
     setupWizard = NULL;
 
@@ -1461,6 +1546,9 @@ void MegaApplication::closeDialogs()
 
     delete sslKeyPinningError;
     sslKeyPinningError = NULL;
+
+    delete bwOverquotaDialog;
+    bwOverquotaDialog = NULL;
 }
 
 void MegaApplication::rebootApplication(bool update)
@@ -1520,7 +1608,10 @@ void MegaApplication::exitApplication()
     if (!exitDialog)
     {
         exitDialog = new QMessageBox(QMessageBox::Question, tr("MEGAsync"),
-                                     tr("Synchronization will stop.\n\nExit anyway?"), QMessageBox::Yes|QMessageBox::No);
+                                     tr("Are you sure you want to exit?"), QMessageBox::Yes|QMessageBox::No);
+//        TO-DO: Uncomment when asset is included to the project
+//        exitDialog->setIconPixmap(QPixmap(Utilities::getDevicePixelRatio() < 2 ? QString::fromUtf8(":/images/mbox-question.png")
+//                                                            : QString::fromUtf8(":/images/mbox-question@2x.png")));
         int button = exitDialog->exec();
         if (!exitDialog)
         {
@@ -1789,7 +1880,9 @@ void MegaApplication::checkMemoryUsage()
     }
 
     if (maxMemoryUsage > preferences->getMaxMemoryUsage()
-            && maxMemoryUsage > 100 * 1024 * 1024 + 2 * 1024 * (totalNodes + totalTransfers))
+            && maxMemoryUsage > 268435456 //256MB
+            + 2028 * totalNodes // 2KB per node
+            + 5120 * totalTransfers) // 5KB per transfer
     {
         long long currentTime = QDateTime::currentMSecsSinceEpoch();
         if (currentTime - preferences->getMaxMemoryReportTime() > 86400000)
@@ -1846,6 +1939,12 @@ void MegaApplication::periodicTasks()
 
     if (trayIcon)
     {
+#ifdef Q_OS_LINUX
+        if (counter==4 && getenv("XDG_CURRENT_DESKTOP") && !strcmp(getenv("XDG_CURRENT_DESKTOP"),"XFCE"))
+        {
+            trayIcon->hide();
+        }
+#endif
         trayIcon->show();
     }
 }
@@ -1872,6 +1971,8 @@ void MegaApplication::cleanAll()
     }
 
     closeDialogs();
+    removeAllFinishedTransfers();
+    clearViewedTransfers();
 
     delete bwOverquotaDialog;
     bwOverquotaDialog = NULL;
@@ -1885,8 +1986,24 @@ void MegaApplication::cleanAll()
     httpServer = NULL;
     delete uploader;
     uploader = NULL;
+    delete downloader;
+    downloader = NULL;
     delete delegateListener;
     delegateListener = NULL;
+
+    // Delete menus and menu items
+    deleteMenu(initialMenu);
+    initialMenu = NULL;
+    deleteMenu(trayMenu);
+    trayMenu = NULL;
+    deleteMenu(trayOverQuotaMenu);
+    trayOverQuotaMenu = NULL;
+    deleteMenu(trayGuestMenu);
+    trayGuestMenu = NULL;
+#ifdef _WIN32
+    deleteMenu(windowsMenu);
+    windowsMenu = NULL;
+#endif
 
     // Ensure that there aren't objects deleted with deleteLater()
     // that may try to access megaApi after
@@ -1894,10 +2011,18 @@ void MegaApplication::cleanAll()
     QApplication::processEvents();
 
     delete megaApi;
+    megaApi = NULL;
+
     delete megaApiFolders;
+    megaApiFolders = NULL;
 
     preferences->setLastExit(QDateTime::currentMSecsSinceEpoch());
     trayIcon->deleteLater();
+    trayIcon = NULL;
+
+    MegaApi::setLoggerObject(NULL);
+    delete logger;
+    logger = NULL;
 
     if (reboot)
     {
@@ -1938,16 +2063,6 @@ void MegaApplication::onDupplicateLink(QString, QString name, MegaHandle handle)
     addRecentFile(name, handle);
 }
 
-void MegaApplication::onDupplicateTransfer(QString localPath, QString name, MegaHandle handle, QString nodeKey)
-{
-    if (appfinished)
-    {
-        return;
-    }
-
-    addRecentFile(name, handle, localPath, nodeKey);
-}
-
 void MegaApplication::onInstallUpdateClicked()
 {
     if (appfinished)
@@ -1978,23 +2093,26 @@ void MegaApplication::showInfoDialog()
         megaApi->retryPendingConnections();
     }
 
-    if (bwOverquotaTimestamp > QDateTime::currentMSecsSinceEpoch() / 1000)
+    if (preferences && preferences->logged())
     {
-        openBwOverquotaDialog();
-        return;
-    }
-    else if (bwOverquotaTimestamp)
-    {
-        bwOverquotaTimestamp = 0;
-        preferences->clearTemporalBandwidth();
-        if (bwOverquotaDialog)
+        if (bwOverquotaTimestamp > QDateTime::currentMSecsSinceEpoch() / 1000)
         {
-            bwOverquotaDialog->refreshAccountDetails();
+                openBwOverquotaDialog();
+                return;
         }
-#ifdef __MACH__
-        trayIcon->setContextMenu(&emptyMenu);
-#endif
-        megaApi->getAccountDetails();
+        else if (bwOverquotaTimestamp)
+        {
+            bwOverquotaTimestamp = 0;
+            preferences->clearTemporalBandwidth();
+            if (bwOverquotaDialog)
+            {
+                bwOverquotaDialog->refreshAccountDetails();
+            }
+    #ifdef __MACH__
+            trayIcon->setContextMenu(&emptyMenu);
+    #endif
+            megaApi->getAccountDetails();
+        }
     }
 
     if (infoOverQuota)
@@ -2047,8 +2165,8 @@ void MegaApplication::showInfoDialog()
                 infoDialog->moveArrow(localCoordinates);
             #endif
 
-            infoDialog->updateTransfers();
             infoDialog->show();
+            infoDialog->updateState();
             infoDialog->setFocus();
             infoDialog->raise();
             infoDialog->activateWindow();
@@ -2161,9 +2279,65 @@ void MegaApplication::calculateInfoDialogCoordinates(QDialog *dialog, int *posx,
 
 }
 
-bool MegaApplication::anUpdateIsAvailable()
+void MegaApplication::deleteMenu(QMenu *menu)
 {
-    return updateAvailable;
+    if (menu)
+    {
+        QList<QAction *> actions = menu->actions();
+        for (int i = 0; i < actions.size(); i++)
+        {
+            menu->removeAction(actions[i]);
+            delete actions[i];
+        }
+        delete menu;
+    }
+}
+
+void MegaApplication::startHttpServer()
+{
+    //Start the HTTP server
+    delete httpServer;
+    httpServer = new HTTPServer(megaApi, Preferences::HTTPS_PORT, true);
+    connect(httpServer, SIGNAL(onLinkReceived(QString, QString)), this, SLOT(externalDownload(QString, QString)), Qt::QueuedConnection);
+    connect(httpServer, SIGNAL(onExternalDownloadRequested(QQueue<mega::MegaNode *>)), this, SLOT(externalDownload(QQueue<mega::MegaNode *>)));
+    connect(httpServer, SIGNAL(onExternalDownloadRequestFinished()), this, SLOT(processDownloads()), Qt::QueuedConnection);
+    connect(httpServer, SIGNAL(onSyncRequested(long long)), this, SLOT(syncFolder(long long)), Qt::QueuedConnection);
+    MegaApi::log(MegaApi::LOG_LEVEL_INFO, "Local HTTPS server started");
+}
+
+void MegaApplication::initHttpsServer()
+{
+    if (preferences->getHttpsCertExpiration() - (QDateTime::currentMSecsSinceEpoch() / 1000) < Preferences::LOCAL_HTTPS_CERT_MAX_EXPIRATION_SECS)
+    {
+        megaApi->sendEvent(99515, "Local SSL certificate about to expire");
+        megaApi->getLocalSSLCertificate();
+    }
+    else
+    {
+        startHttpServer();
+
+        char *os = megaApi->getOperatingSystemVersion();
+        if (os)
+        {
+            if (!QString::fromUtf8(os).startsWith(QString::fromUtf8("Windows 5.")))
+            {
+                ConnectivityChecker *localHttpsChecker = new ConnectivityChecker(Preferences::LOCAL_HTTPS_TEST_URL);
+                localHttpsChecker->setTestString(Preferences::LOCAL_HTTPS_TEST_SUBSTRING);
+                localHttpsChecker->setTimeout(Preferences::LOCAL_HTTPS_TEST_TIMEOUT_MS);
+                localHttpsChecker->setMethod(ConnectivityChecker::METHOD_POST);
+                localHttpsChecker->setPostData(QByteArray(Preferences::LOCAL_HTTPS_TEST_POST_DATA.toUtf8()));
+                localHttpsChecker->setHeader(QByteArray("Origin"), QByteArray("https://mega.nz"));
+
+                connect(localHttpsChecker, SIGNAL(testError()), this, SLOT(onLocalHttpsCheckError()));
+                connect(localHttpsChecker, SIGNAL(testSuccess()), this, SLOT(onLocalHttpsCheckSuccess()));
+                connect(localHttpsChecker, SIGNAL(testFinished()), localHttpsChecker, SLOT(deleteLater()));
+
+                MegaApi::log(MegaApi::LOG_LEVEL_INFO, "Testing the local HTTPS server");
+                localHttpsChecker->startCheck();
+            }
+            delete [] os;
+        }
+    }
 }
 
 void MegaApplication::triggerInstallUpdate()
@@ -2283,6 +2457,17 @@ void MegaApplication::onConnectivityCheckError()
     }
 
     showErrorMessage(tr("MEGAsync is unable to connect. Please check your Internet connectivity and local firewall configuration. Note that most antivirus software includes a firewall."));
+}
+
+void MegaApplication::onLocalHttpsCheckSuccess()
+{
+    MegaApi::log(MegaApi::LOG_LEVEL_INFO, "Local HTTPS check succeeded");
+}
+
+void MegaApplication::onLocalHttpsCheckError()
+{
+    megaApi->sendEvent(99516, "Local HTTPS check failed");
+    megaApi->getLocalSSLCertificate();
 }
 
 void MegaApplication::setupWizardFinished(int result)
@@ -2420,7 +2605,7 @@ void MegaApplication::showInfoMessage(QString message, QString title)
     }
     else
     {
-        QMessageBox::information(NULL, title, message);
+        QMegaMessageBox::information(NULL, title, message, Utilities::getDevicePixelRatio());
     }
 }
 
@@ -2444,7 +2629,7 @@ void MegaApplication::showWarningMessage(QString message, QString title)
         notificator->notify(Notificator::Warning, title, message,
                                     QIcon(QString::fromUtf8("://images/app_128.png")));
     }
-    else QMessageBox::warning(NULL, title, message);
+    else QMegaMessageBox::warning(NULL, title, message, Utilities::getDevicePixelRatio());
 }
 
 void MegaApplication::showErrorMessage(QString message, QString title)
@@ -2468,7 +2653,7 @@ void MegaApplication::showErrorMessage(QString message, QString title)
     }
     else
     {
-        QMessageBox::critical(NULL, title, message);
+        QMegaMessageBox::critical(NULL, title, message, Utilities::getDevicePixelRatio());
     }
 }
 
@@ -2512,6 +2697,53 @@ void MegaApplication::setUploadLimit(int limit)
     }
 }
 
+void MegaApplication::setMaxUploadSpeed(int limit)
+{
+    if (appfinished)
+    {
+        return;
+    }
+
+    if (limit <= 0)
+    {
+        megaApi->setMaxUploadSpeed(0);
+    }
+    else
+    {
+        megaApi->setMaxUploadSpeed(limit * 1024);
+    }
+}
+
+void MegaApplication::setMaxDownloadSpeed(int limit)
+{
+    if (appfinished)
+    {
+        return;
+    }
+
+    if (limit <= 0)
+    {
+        megaApi->setMaxDownloadSpeed(0);
+    }
+    else
+    {
+        megaApi->setMaxDownloadSpeed(limit * 1024);
+    }
+}
+
+void MegaApplication::setMaxConnections(int direction, int connections)
+{
+    if (appfinished)
+    {
+        return;
+    }
+
+    if (connections > 0 && connections <= 6)
+    {
+        megaApi->setMaxConnections(direction, connections);
+    }
+}
+
 void MegaApplication::setUseHttpsOnly(bool httpsOnly)
 {
     if (appfinished)
@@ -2545,6 +2777,7 @@ void MegaApplication::startUpdateTask()
         connect(updateTask, SIGNAL(installingUpdate(bool)), this, SLOT(onInstallingUpdate(bool)), Qt::UniqueConnection);
         connect(updateTask, SIGNAL(updateNotFound(bool)), this, SLOT(onUpdateNotFound(bool)), Qt::UniqueConnection);
         connect(updateTask, SIGNAL(updateError()), this, SLOT(onUpdateError()), Qt::UniqueConnection);
+        connect(updateTask, SIGNAL(deprecatedOperatingSystem()), this, SLOT(onDeprecatedOperatingSystem()), Qt::UniqueConnection);
 
         connect(updateThread, SIGNAL(finished()), updateTask, SLOT(deleteLater()), Qt::UniqueConnection);
         connect(updateThread, SIGNAL(finished()), updateThread, SLOT(deleteLater()), Qt::UniqueConnection);
@@ -2627,14 +2860,17 @@ void MegaApplication::applyProxySettings()
     }
 
     megaApi->setProxySettings(proxySettings);
+    megaApiFolders->setProxySettings(proxySettings);
     delete proxySettings;
     QNetworkProxy::setApplicationProxy(proxy);
     megaApi->retryPendingConnections(true, true);
+    megaApiFolders->retryPendingConnections(true, true);
 }
 
-void MegaApplication::showUpdatedMessage()
+void MegaApplication::showUpdatedMessage(int lastVersion)
 {
     updated = true;
+    prevVersion = lastVersion;
 }
 
 void MegaApplication::handleMEGAurl(const QUrl &url)
@@ -2655,6 +2891,67 @@ void MegaApplication::handleLocalPath(const QUrl &url)
     }
 
     QtConcurrent::run(QDesktopServices::openUrl, QUrl::fromLocalFile(QDir::toNativeSeparators(url.fragment())));
+}
+
+void MegaApplication::clearViewedTransfers()
+{
+    nUnviewedTransfers = 0;
+    if (transferManager)
+    {
+        transferManager->updateNumberOfCompletedTransfers(nUnviewedTransfers);
+    }
+}
+
+void MegaApplication::onCompletedTransfersTabActive(bool active)
+{
+    completedTabActive = active;
+}
+
+void MegaApplication::checkFirstTransfer()
+{
+    if (appfinished || !megaApi)
+    {
+        return;
+    }
+
+    if (numTransfers[MegaTransfer::TYPE_DOWNLOAD] && activeTransferPriority[MegaTransfer::TYPE_DOWNLOAD] == 0xFFFFFFFFFFFFFFFFULL)
+    {
+        MegaTransfer *nextTransfer = megaApi->getFirstTransfer(MegaTransfer::TYPE_DOWNLOAD);
+        if (nextTransfer)
+        {
+            onTransferUpdate(megaApi, nextTransfer);
+            delete nextTransfer;
+        }
+    }
+
+    if (numTransfers[MegaTransfer::TYPE_UPLOAD] && activeTransferPriority[MegaTransfer::TYPE_UPLOAD] == 0xFFFFFFFFFFFFFFFFULL)
+    {
+        MegaTransfer *nextTransfer = megaApi->getFirstTransfer(MegaTransfer::TYPE_UPLOAD);
+        if (nextTransfer)
+        {
+            onTransferUpdate(megaApi, nextTransfer);
+            delete nextTransfer;
+        }
+    }
+}
+
+void MegaApplication::onDeprecatedOperatingSystem()
+{
+#ifdef __APPLE__
+    if (!preferences->isOneTimeActionDone(Preferences::ONE_TIME_ACTION_DEPRECATED_OPERATING_SYSTEM))
+    {
+        QMegaMessageBox::warning(NULL, tr("MEGAsync"),
+                             tr("Please consider updating your operating system.") + QString::fromUtf8("\n")
+                             + tr("MEGAsync will continue to work, however updates will no longer be supported for versions prior to OS X Mavericks soon."),
+                             Utilities::getDevicePixelRatio());
+        preferences->setOneTimeActionDone(Preferences::ONE_TIME_ACTION_DEPRECATED_OPERATING_SYSTEM, true);
+    }
+#endif
+}
+
+int MegaApplication::getPrevVersion()
+{
+    return prevVersion;
 }
 
 void MegaApplication::updateUserStats()
@@ -2790,6 +3087,50 @@ void MegaApplication::toggleLogging()
     }
 }
 
+void MegaApplication::removeFinishedTransfer(int transferTag)
+{
+    QMap<int, MegaTransfer*>::iterator it = finishedTransfers.find(transferTag);
+    if (it != finishedTransfers.end())
+    {     
+        for (QList<MegaTransfer*>::iterator it2 = finishedTransferOrder.begin(); it2 != finishedTransferOrder.end(); it2++)
+        {
+            if ((*it2)->getTag() == transferTag)
+            {
+                finishedTransferOrder.erase(it2);
+                break;
+            }
+        }
+        delete it.value();
+        finishedTransfers.erase(it);
+    }
+}
+
+void MegaApplication::removeAllFinishedTransfers()
+{
+    qDeleteAll(finishedTransfers);
+    finishedTransferOrder.clear();
+    finishedTransfers.clear();
+}
+
+QList<MegaTransfer*> MegaApplication::getFinishedTransfers()
+{
+    return finishedTransferOrder;
+}
+
+int MegaApplication::getNumUnviewedTransfers()
+{
+    return nUnviewedTransfers;
+}
+
+MegaTransfer* MegaApplication::getFinishedTransferByTag(int tag)
+{
+    if (!finishedTransfers.contains(tag))
+    {
+        return NULL;
+    }
+    return finishedTransfers.value(tag);
+}
+
 //Called when the "Import links" menu item is clicked
 void MegaApplication::importLinks()
 {
@@ -2864,7 +3205,6 @@ void MegaApplication::importLinks()
         {
             preferences->setDownloadFolder(importDialog->getDownloadPath());
         }
-        connect(linkProcessor, SIGNAL(dupplicateDownload(QString, QString, mega::MegaHandle, QString)), this, SLOT(onDupplicateTransfer(QString, QString, mega::MegaHandle, QString)));
         linkProcessor->downloadLinks(importDialog->getDownloadPath());
     }
 
@@ -3039,6 +3379,30 @@ void MegaApplication::streamActionClicked()
     streamSelector->show();
 }
 
+void MegaApplication::transferManagerActionClicked()
+{
+    if (appfinished)
+    {
+        return;
+    }
+
+    if (transferManager)
+    {
+        transferManager->showNormal();
+        transferManager->activateWindow();
+        transferManager->raise();
+        transferManager->updateState();
+        return;
+    }
+
+    transferManager = new TransferManager(megaApi);
+    // Signal/slot to notify the tracking of unseen completed transfers of Transfer Manager. If Completed tab is
+    // active, tracking is disabled
+    connect(transferManager, SIGNAL(viewedCompletedTransfers()), this, SLOT(clearViewedTransfers()));
+    connect(transferManager, SIGNAL(completedTransfersTabActive(bool)), this, SLOT(onCompletedTransfersTabActive(bool)));
+    transferManager->show();
+}
+
 void MegaApplication::loginActionClicked()
 {
     if (appfinished)
@@ -3105,7 +3469,6 @@ void MegaApplication::createTrayIcon()
         trayIcon = new QSystemTrayIcon();
     #endif
 
-
         connect(trayIcon, SIGNAL(messageClicked()), this, SLOT(onMessageClicked()));
         connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
                 this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
@@ -3166,6 +3529,7 @@ void MegaApplication::createTrayIcon()
     }
 #endif
 }
+
 void MegaApplication::processUploads()
 {
     if (appfinished)
@@ -3218,11 +3582,7 @@ void MegaApplication::processUploads()
     }
     uploadFolderSelector = new UploadToMegaDialog(megaApi);
     uploadFolderSelector->setDefaultFolder(preferences->uploadFolder());
-
-#ifdef WIN32
-    uploadFolderSelector->showMinimized();
-    uploadFolderSelector->showNormal();
-#endif
+    Platform::activateBackgroundWindow(uploadFolderSelector);
     uploadFolderSelector->exec();
     if (!uploadFolderSelector)
     {
@@ -3249,7 +3609,6 @@ void MegaApplication::processUploads()
     return;
 
 }
-
 
 void MegaApplication::processDownloads()
 {
@@ -3294,10 +3653,7 @@ void MegaApplication::processDownloads()
     }
 
     downloadFolderSelector = new DownloadFromMegaDialog(preferences->downloadFolder());
-#ifdef WIN32
-    downloadFolderSelector->showMinimized();
-    downloadFolderSelector->showNormal();
-#endif
+    Platform::activateBackgroundWindow(downloadFolderSelector);
     downloadFolderSelector->exec();
     if (!downloadFolderSelector)
     {
@@ -3403,6 +3759,7 @@ void MegaApplication::copyFileLink(MegaHandle fileHandle, QString nodeKey)
         delete exportableNode;
         return;
     }
+
     delete node;
     delete [] fp;
     showErrorMessage(tr("The link can't be generated because the file is in an incoming shared folder or in your Rubbish Bin"));
@@ -3429,6 +3786,20 @@ void MegaApplication::shellExport(QQueue<QString> newExportQueue)
     }
 
     ExportProcessor *processor = new ExportProcessor(megaApi, newExportQueue);
+    connect(processor, SIGNAL(onRequestLinksFinished()), this, SLOT(onRequestLinksFinished()));
+    processor->requestLinks();
+    exportOps++;
+}
+
+void MegaApplication::exportNodes(QList<MegaHandle> exportList, QStringList extraLinks)
+{
+    if (appfinished || !megaApi->isLoggedIn())
+    {
+        return;
+    }
+
+    this->extraLinks.append(extraLinks);
+    ExportProcessor *processor = new ExportProcessor(megaApi, exportList);
     connect(processor, SIGNAL(onRequestLinksFinished()), this, SLOT(onRequestLinksFinished()));
     processor->requestLinks();
     exportOps++;
@@ -3515,6 +3886,9 @@ void MegaApplication::onRequestLinksFinished()
 
     ExportProcessor *exportProcessor = ((ExportProcessor *)QObject::sender());
     QStringList links = exportProcessor->getValidLinks();
+    links.append(extraLinks);
+    extraLinks.clear();
+
     if (!links.size())
     {
         exportOps--;
@@ -3859,11 +4233,7 @@ void MegaApplication::openInfoWizard()
     infoWizard = new InfoWizard();
     connect(infoWizard, SIGNAL(actionButtonClicked(int)), this, SLOT(userAction(int)));
     connect(infoWizard, SIGNAL(finished(int)), this, SLOT(infoWizardDialogFinished(int)));
-
-#ifdef WIN32
-    infoWizard->showMinimized();
-    infoWizard->showNormal();
-#endif
+    Platform::activateBackgroundWindow(infoWizard);
     infoWizard->show();
 }
 
@@ -3878,11 +4248,7 @@ void MegaApplication::openBwOverquotaDialog()
     {
         bwOverquotaDialog = new UpgradeDialog(megaApi, pricing);
         connect(bwOverquotaDialog, SIGNAL(finished(int)), this, SLOT(overquotaDialogFinished(int)));
-
-#ifdef WIN32
-        bwOverquotaDialog->showMinimized();
-        bwOverquotaDialog->showNormal();
-#endif
+        Platform::activateBackgroundWindow(bwOverquotaDialog);
         bwOverquotaDialog->show();
 
         if (!bwOverquotaEvent)
@@ -4026,6 +4392,86 @@ void MegaApplication::createTrayMenu()
 
     windowsExitAction = new QAction(tr("Exit"), this);
     connect(windowsExitAction, SIGNAL(triggered()), this, SLOT(exitApplication()));
+
+    if (windowsSettingsAction)
+    {
+        windowsSettingsAction->deleteLater();
+        windowsSettingsAction = NULL;
+    }
+
+    windowsSettingsAction = new QAction(tr("Settings"), this);
+    connect(windowsSettingsAction, SIGNAL(triggered()), this, SLOT(openSettings()));
+
+    if (windowsImportLinksAction)
+    {
+        windowsImportLinksAction->deleteLater();
+        windowsImportLinksAction = NULL;
+    }
+
+    windowsImportLinksAction = new QAction(tr("Import links"), this);
+    connect(windowsImportLinksAction, SIGNAL(triggered()), this, SLOT(importLinks()));
+
+    if (windowsUploadAction)
+    {
+        windowsUploadAction->deleteLater();
+        windowsUploadAction = NULL;
+    }
+
+    windowsUploadAction = new QAction(tr("Upload"), this);
+    connect(windowsUploadAction, SIGNAL(triggered()), this, SLOT(uploadActionClicked()));
+
+    if (windowsDownloadAction)
+    {
+        windowsDownloadAction->deleteLater();
+        windowsDownloadAction = NULL;
+    }
+
+    windowsDownloadAction = new QAction(tr("Download"), this);
+    connect(windowsDownloadAction, SIGNAL(triggered()), this, SLOT(downloadActionClicked()));
+
+    if (windowsStreamAction)
+    {
+        windowsStreamAction->deleteLater();
+        windowsStreamAction = NULL;
+    }
+
+    windowsStreamAction = new QAction(tr("Stream from MEGA"), this);
+    connect(windowsStreamAction, SIGNAL(triggered()), this, SLOT(streamActionClicked()));
+
+    if (windowsTransferManagerAction)
+    {
+        windowsTransferManagerAction->deleteLater();
+        windowsTransferManagerAction = NULL;
+    }
+
+    windowsTransferManagerAction = new QAction(tr("Transfer manager"), this);
+    connect(windowsTransferManagerAction, SIGNAL(triggered()), this, SLOT(transferManagerActionClicked()));
+
+    if (windowsUpdateAction)
+    {
+        windowsUpdateAction->deleteLater();
+        windowsUpdateAction = NULL;
+    }
+
+    if (updateAvailable)
+    {
+        windowsUpdateAction = new QAction(tr("Install update"), this);
+    }
+    else
+    {
+        windowsUpdateAction = new QAction(tr("About"), this);
+    }
+    connect(windowsUpdateAction, SIGNAL(triggered()), this, SLOT(onInstallUpdateClicked()));
+
+    windowsMenu->addAction(windowsUpdateAction);
+    windowsMenu->addSeparator();
+    windowsMenu->addAction(windowsImportLinksAction);
+    windowsMenu->addAction(windowsUploadAction);
+    windowsMenu->addAction(windowsDownloadAction);
+    windowsMenu->addAction(windowsStreamAction);
+    windowsMenu->addAction(windowsTransferManagerAction);
+    windowsMenu->addAction(windowsSettingsAction);
+    windowsMenu->addSeparator();
     windowsMenu->addAction(windowsExitAction);
 #endif
 
@@ -4179,7 +4625,6 @@ void MegaApplication::createOverQuotaMenu()
     exitActionOverquota = new QAction(tr("Quit"), this);
 #endif
     connect(exitActionOverquota, SIGNAL(triggered()), this, SLOT(exitApplication()));
-
 
     if (logoutActionOverquota)
     {
@@ -4339,8 +4784,7 @@ void MegaApplication::onRequestStart(MegaApi* , MegaRequest *request)
         return;
     }
 
-    int type = request->getType();
-    if (type == MegaRequest::TYPE_LOGIN)
+    if (request->getType() == MegaRequest::TYPE_LOGIN)
     {
         connectivityTimer->start();
     }
@@ -4394,7 +4838,8 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
         onGlobalSyncStateChanged(megaApi);
     }
 
-    switch (request->getType()) {
+    switch (request->getType())
+    {
     case MegaRequest::TYPE_EXPORT:
     {
         if (!exportOps && e->getErrorCode() == MegaError::API_OK)
@@ -4413,6 +4858,11 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
         if (infoDialog)
         {
             infoDialog->disableGetLink(false);
+        }
+
+        if (transferManager)
+        {
+            transferManager->disableGetLink(false);
         }
 
         break;
@@ -4457,12 +4907,12 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
             }
             else if (errorCode == MegaError::API_EBLOCKED)
             {
-                QMessageBox::critical(NULL, tr("MEGAsync"), tr("Your account has been blocked. Please contact support@mega.co.nz"));
+                QMegaMessageBox::critical(NULL, tr("MEGAsync"), tr("Your account has been blocked. Please contact support@mega.co.nz"), Utilities::getDevicePixelRatio());
             }
             else if (errorCode != MegaError::API_ESID && errorCode != MegaError::API_ESSL)
             //Invalid session or public key, already managed in TYPE_LOGOUT
             {
-                QMessageBox::warning(NULL, tr("MEGAsync"), tr("Login error: %1").arg(QCoreApplication::translate("MegaError", e->getErrorString())));
+                QMegaMessageBox::warning(NULL, tr("MEGAsync"), tr("Login error: %1").arg(QCoreApplication::translate("MegaError", e->getErrorString())), Utilities::getDevicePixelRatio());
             }
 
             //Wrong login -> logout
@@ -4484,6 +4934,11 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
                                                 tr("Our SSL key can't be verified. You could be affected by a man-in-the-middle attack or your antivirus software could be intercepting your communications and causing this problem. Please disable it and try again.")
                                                 + QString::fromUtf8(" (Issuer: %1)").arg(QString::fromUtf8(request->getText() ? request->getText() : "Unknown")),
                                                          QMessageBox::Retry | QMessageBox::Yes | QMessageBox::Cancel);
+
+            //        TO-DO: Uncomment when asset is included to the project
+            //        sslKeyPinningError->setIconPixmap(QPixmap(Utilities::getDevicePixelRatio() < 2 ? QString::fromUtf8(":/images/mbox-critical.png")
+            //                                                    : QString::fromUtf8(":/images/mbox-critical@2x.png")));
+
                     sslKeyPinningError->setButtonText(QMessageBox::Yes, trUtf8("I don't care"));
                     sslKeyPinningError->setButtonText(QMessageBox::Cancel, trUtf8("Logout"));
                     sslKeyPinningError->setButtonText(QMessageBox::Retry, trUtf8("Retry"));
@@ -4538,18 +4993,18 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
 
             if (errorCode == MegaError::API_ESID)
             {
-                QMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("You have been logged out on this computer from another location"));
+                QMegaMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("You have been logged out on this computer from another location"), Utilities::getDevicePixelRatio());
             }
             else if (errorCode == MegaError::API_ESSL)
             {
-                QMessageBox::critical(NULL, QString::fromAscii("MEGAsync"),
+                QMegaMessageBox::critical(NULL, QString::fromAscii("MEGAsync"),
                                       tr("Our SSL key can't be verified. You could be affected by a man-in-the-middle attack or your antivirus software could be intercepting your communications and causing this problem. Please disable it and try again.")
-                                       + QString::fromUtf8(" (Issuer: %1)").arg(QString::fromUtf8(request->getText() ? request->getText() : "Unknown")));
+                                       + QString::fromUtf8(" (Issuer: %1)").arg(QString::fromUtf8(request->getText() ? request->getText() : "Unknown")), Utilities::getDevicePixelRatio());
             }
             else if (errorCode != MegaError::API_EACCESS)
             {
-                QMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("You have been logged out because of this error: %1")
-                                         .arg(QCoreApplication::translate("MegaError", e->getErrorString())));
+                QMegaMessageBox::information(NULL, QString::fromAscii("MEGAsync"), tr("You have been logged out because of this error: %1")
+                                         .arg(QCoreApplication::translate("MegaError", e->getErrorString())), Utilities::getDevicePixelRatio());
             }
             unlink();
         }
@@ -4558,6 +5013,8 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
         {
             preferences->unlink();
             closeDialogs();
+            removeAllFinishedTransfers();
+            clearViewedTransfers();
             delete infoOverQuota;
             infoOverQuota = NULL;
             paused = false;
@@ -4566,6 +5023,51 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
             preferences->setFirstStartDone();
             start();
         }
+        break;
+    }
+    case MegaRequest::TYPE_GET_LOCAL_SSL_CERT:
+    {
+        if (e->getErrorCode() == MegaError::API_OK)
+        {
+            MegaStringMap *data = request->getMegaStringMap();
+            preferences->setHttpsKey(QString::fromUtf8(data->get("key")));
+            preferences->setHttpsCert(QString::fromUtf8(data->get("cert")));
+
+            QString intermediates;
+            QString key = QString::fromUtf8("intermediate_");
+            const char *value;
+            int i = 1;
+            while ((value = data->get((key + QString::number(i)).toUtf8().constData())))
+            {
+                if (i != 1)
+                {
+                    intermediates.append(QString::fromUtf8(";"));
+                }
+                intermediates.append(QString::fromUtf8(value));
+                i++;
+            }
+
+            preferences->setHttpsCertIntermediate(intermediates);
+            preferences->setHttpsCertExpiration(request->getNumber());
+            megaApi->sendEvent(99517, "Local SSL certificate renewed");
+            startHttpServer();
+            break;
+        }
+
+        MegaApi::log(MegaApi::LOG_LEVEL_INFO, "Error renewing the local SSL certificate");
+        if (e->getErrorCode() == MegaError::API_EACCESS)
+        {
+            static bool retried = false;
+            if (!retried)
+            {
+                retried = true;
+                MegaApi::log(MegaApi::LOG_LEVEL_INFO, "Trying to renew the local SSL certificate again");
+                megaApi->getLocalSSLCertificate();
+                break;
+            }
+        }
+
+        startHttpServer();
         break;
     }
     case MegaRequest::TYPE_FETCH_NODES:
@@ -4590,7 +5092,8 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
             {
                 MegaApi::log(MegaApi::LOG_LEVEL_ERROR, QString::fromUtf8("Error fetching nodes: %1")
                              .arg(QString::fromUtf8(e->getErrorString())).toUtf8().constData());
-                QMessageBox::warning(NULL, tr("Error"), QCoreApplication::translate("MegaError", e->getErrorString()), QMessageBox::Ok);
+                QMegaMessageBox::warning(NULL, tr("Error"), QCoreApplication::translate("MegaError", e->getErrorString()),
+                                         Utilities::getDevicePixelRatio(), QMessageBox::Ok);
                 unlink();
             }
         }
@@ -4739,8 +5242,38 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
     }
     case MegaRequest::TYPE_PAUSE_TRANSFERS:
     {
-        paused = request->getFlag();
-        preferences->setWasPaused(paused);
+        bool paused = request->getFlag();
+        switch (request->getNumber())
+        {
+            case MegaTransfer::TYPE_DOWNLOAD:
+                preferences->setDownloadsPaused(paused);
+                break;
+            case MegaTransfer::TYPE_UPLOAD:
+                preferences->setUploadsPaused(paused);
+                break;
+            default:
+                preferences->setUploadsPaused(paused);
+                preferences->setDownloadsPaused(paused);
+                preferences->setGlobalPaused(paused);
+                this->paused = paused;
+                break;
+        }
+        if (preferences->getDownloadsPaused() == preferences->getUploadsPaused())
+        {
+            preferences->setGlobalPaused(paused);
+            this->paused = paused;
+        }
+        else
+        {
+            preferences->setGlobalPaused(false);
+            this->paused = false;
+        }
+
+        if (transferManager)
+        {
+            transferManager->updatePauseState();
+        }
+
         onGlobalSyncStateChanged(megaApi);
         break;
     }
@@ -4750,9 +5283,23 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
         {
             if ((request->getNodeHandle() == preferences->getMegaFolderHandle(i)))
             {
+                QString localFolder = preferences->getLocalFolder(i);
+
+        #ifdef WIN32
+                string path, fsname;
+                path.resize(MAX_PATH * sizeof(WCHAR));
+                if (GetVolumePathNameW((LPCWSTR)localFolder.utf16(), (LPWSTR)path.data(), MAX_PATH))
+                {
+                    fsname.resize(MAX_PATH * sizeof(WCHAR));
+                    if (!GetVolumeInformationW((LPCWSTR)path.data(), NULL, 0, NULL, NULL, NULL, (LPWSTR)fsname.data(), MAX_PATH))
+                    {
+                        fsname.clear();
+                    }
+                }
+        #endif
+
                 if (e->getErrorCode() != MegaError::API_OK)
                 {
-                    QString localFolder = preferences->getLocalFolder(i);
                     MegaNode *node = megaApi->getNodeByHandle(preferences->getMegaFolderHandle(i));
                     const char *nodePath = megaApi->getNodePath(node);
                     delete node;
@@ -4776,16 +5323,11 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
                     {
 #ifdef WIN32
                         WCHAR VBoxSharedFolderFS[] = L"VBoxSharedFolderFS";
-                        string path, fsname;
-                        path.resize(MAX_PATH * sizeof(WCHAR));
-                        fsname.resize(MAX_PATH * sizeof(WCHAR));
-                        if (GetVolumePathNameW((LPCWSTR)localFolder.utf16(), (LPWSTR)path.data(), MAX_PATH)
-                            && GetVolumeInformationW((LPCWSTR)path.data(), NULL, 0, NULL, NULL, NULL, (LPWSTR)fsname.data(), MAX_PATH)
-                            && !memcmp(fsname.data(), VBoxSharedFolderFS, sizeof(VBoxSharedFolderFS)))
+                        if (fsname.size() && !memcmp(fsname.data(), VBoxSharedFolderFS, sizeof(VBoxSharedFolderFS)))
                         {
-                            QMessageBox::critical(NULL, tr("MEGAsync"),
+                            QMegaMessageBox::critical(NULL, tr("MEGAsync"),
                                 tr("Your sync \"%1\" has been disabled because the synchronization of VirtualBox shared folders is not supported due to deficiencies in that filesystem.")
-                                .arg(preferences->getSyncName(i)));
+                                .arg(preferences->getSyncName(i)), Utilities::getDevicePixelRatio());
                         }
                         else
                         {
@@ -4814,7 +5356,9 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
                     delete[] nodePath;
 
                     MegaApi::log(MegaApi::LOG_LEVEL_ERROR, "Error adding sync");
-                    Platform::syncFolderRemoved(localFolder, preferences->getSyncName(i));
+                    Platform::syncFolderRemoved(localFolder,
+                                                preferences->getSyncName(i),
+                                                preferences->getSyncID(i));
                     preferences->setSyncState(i, false);
                     openSettings(SettingsDialog::SYNCS_TAB);
                     if (settingsDialog)
@@ -4841,6 +5385,17 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
                     {
                         SetFileAttributesW((LPCWSTR)debrisPath.utf16(),
                                            fad.dwFileAttributes | FILE_ATTRIBUTE_HIDDEN);
+                    }
+
+                    WCHAR exFatFS[] = L"exFAT";
+                    if (fsname.size() && (!memcmp(fsname.data(), L"FAT", 6) || !memcmp(fsname.data(), exFatFS, sizeof(exFatFS)))
+                            && !preferences->isFatWarningShown())
+                    {
+                        QMessageBox::warning(NULL, tr("MEGAsync"),
+                                         tr("You are syncing a local folder formatted with a FAT filesystem. That filesystem has deficiencies managing big files and modification times that can cause synchronization problems (e.g. when daylight saving changes), so it's strongly recommended that you only sync folders formatted with more reliable filesystems like NTFS (more information [A]here[/A]).")
+                                             .replace(QString::fromUtf8("[A]"), QString::fromUtf8("<a href=\"https://help.mega.nz/megasync/syncing.html#can-i-sync-fat-fat32-partitions-under-windows\">"))
+                                             .replace(QString::fromUtf8("[/A]"), QString::fromUtf8("</a>")));
+                        preferences->setFatWarningShown();
                     }
 #endif
                 }
@@ -4953,46 +5508,26 @@ void MegaApplication::onRequestFinish(MegaApi*, MegaRequest *request, MegaError*
 }
 
 //Called when a transfer is about to start
-void MegaApplication::onTransferStart(MegaApi *, MegaTransfer *transfer)
+void MegaApplication::onTransferStart(MegaApi *api, MegaTransfer *transfer)
 {
     if (appfinished || transfer->isStreamingTransfer() || transfer->isFolderTransfer()
-            || transfer->getTotalBytes() == transfer->getTransferredBytes()) // Skipped transfer
+            || !transfer->getPriority()) // Skipped transfer
     {
         return;
     }
 
-    if (infoDialog && !totalUploadSize && !totalDownloadSize)
+    if (transferManager)
     {
-        infoDialog->setWaiting(true);
+        transferManager->onTransferStart(megaApi, transfer);
+    }
+
+    onTransferUpdate(api, transfer);
+    if (!numTransfers[MegaTransfer::TYPE_DOWNLOAD]
+            && !numTransfers[MegaTransfer::TYPE_UPLOAD])
+    {
         onGlobalSyncStateChanged(megaApi);
     }
-
-    //Update statics
-    if (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD)
-    {
-        totalDownloadSize = transfer->getTotalBytes();
-    }
-    else
-    {
-        totalUploadSize = transfer->getTotalBytes();
-    }
-
-    //Send statics to the information dialog
-    if (infoDialog)
-    {
-        infoDialog->setTotalTransferSize(totalDownloadSize, totalUploadSize);
-        infoDialog->setTransferSpeeds(downloadSpeed, uploadSpeed);
-        infoDialog->updateTransfers();
-    }
-
-    if (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD)
-    {
-        totalDownloadSize++;
-    }
-    else
-    {
-        totalUploadSize++;
-    }
+    numTransfers[transfer->getType()]++;
 }
 
 //Called when there is a temporal problem in a request
@@ -5005,6 +5540,80 @@ void MegaApplication::onTransferFinish(MegaApi* , MegaTransfer *transfer, MegaEr
 {
     if (appfinished || transfer->isStreamingTransfer() || transfer->isFolderTransfer())
     {
+        return;
+    }
+
+    if (transfer->getState() == MegaTransfer::STATE_COMPLETED || transfer->getState() == MegaTransfer::STATE_FAILED)
+    {
+        MegaTransfer *t = transfer->copy();
+        if (finishedTransfers.count(transfer->getTag()))
+        {
+            assert(false);
+            megaApi->sendEvent(99512, QString::fromUtf8("Duplicated finished transfer: %1").arg(QString::number(transfer->getTag())).toUtf8().constData());
+            removeFinishedTransfer(transfer->getTag());
+        }
+
+        finishedTransfers.insert(transfer->getTag(), t);
+        finishedTransferOrder.push_back(t);
+
+        if (!transferManager)
+        {
+            completedTabActive = false;
+        }
+
+        if (!completedTabActive)
+        {
+            ++nUnviewedTransfers;
+        }
+
+        if (transferManager)
+        {
+            transferManager->updateNumberOfCompletedTransfers(nUnviewedTransfers);
+        }
+    }
+
+    if (transferManager)
+    {
+        transferManager->onTransferFinish(megaApi, transfer, e);
+    }
+
+    if (finishedTransferOrder.size() > Preferences::MAX_COMPLETED_ITEMS)
+    {
+        removeFinishedTransfer(finishedTransferOrder.first()->getTag());
+    }
+
+    //Show the transfer in the "recently updated" list
+    if (e->getErrorCode() == MegaError::API_OK && transfer->getNodeHandle() != INVALID_HANDLE)
+    {
+        QString localPath;
+        if (transfer->getPath())
+        {
+            localPath = QString::fromUtf8(transfer->getPath());
+        }
+
+#ifdef WIN32
+        if (localPath.startsWith(QString::fromAscii("\\\\?\\")))
+        {
+            localPath = localPath.mid(4);
+        }
+#endif
+
+        MegaNode *node = transfer->getPublicMegaNode();
+        QString publicKey;
+        if (node)
+        {
+            const char* key = node->getBase64Key();
+            publicKey = QString::fromUtf8(key);
+            delete [] key;
+            delete node;
+        }
+
+        addRecentFile(QString::fromUtf8(transfer->getFileName()), transfer->getNodeHandle(), localPath, publicKey);
+    }
+
+    if (!transfer->getPriority())
+    {
+        // Skipped transfer
         return;
     }
 
@@ -5051,103 +5660,36 @@ void MegaApplication::onTransferFinish(MegaApi* , MegaTransfer *transfer, MegaEr
         isFirstFileSynced = true;
     }
 
-    //Update statics
-    if (transfer->getType()==MegaTransfer::TYPE_DOWNLOAD)
-    {
-        //Show the transfer in the "recently updated" list
-        if (e->getErrorCode() == MegaError::API_OK)
-        {
-            QString localPath = QString::fromUtf8(transfer->getPath());
-#ifdef WIN32
-            if (localPath.startsWith(QString::fromAscii("\\\\?\\")))
-            {
-                localPath = localPath.mid(4);
-            }
-#endif
+    int type = transfer->getType();
+    unsigned long long priority = transfer->getPriority();
 
-            MegaNode *node = transfer->getPublicMegaNode();
-            QString publicKey;
-            if (node)
-            {
-                const char* key = node->getBase64Key();
-                publicKey = QString::fromUtf8(key);
-                delete [] key;
-                delete node;
-            }
-            addRecentFile(QString::fromUtf8(transfer->getFileName()), transfer->getNodeHandle(), localPath, publicKey);
-            if (!transfer->getSpeed())
-            {
-                // Skipped transfer
-                return;
-            }
+    numTransfers[type]--;
+    if (priority <= activeTransferPriority[type]
+            || activeTransferState[type] == MegaTransfer::STATE_PAUSED
+            || transfer->getTag() == activeTransferTag[type])
+    {
+        activeTransferPriority[type] = 0xFFFFFFFFFFFFFFFFULL;
+        activeTransferState[type] = MegaTransfer::STATE_NONE;
+        activeTransferTag[type] = 0;
+
+        //Send updated statics to the information dialog
+        if (infoDialog)
+        {
+            infoDialog->setTransfer(transfer);
+            infoDialog->updateTransfers();
+            infoDialog->transferFinished(e->getErrorCode());
         }
 
-        totalDownloadedSize += transfer->getDeltaSize();
-        downloadSpeed = transfer->getSpeed();
-    }
-    else
-    {
-        totalUploadedSize += transfer->getDeltaSize();
-        uploadSpeed = transfer->getSpeed();
-
-        //Here the file isn't added to the "recently updated" list,
-        //because the file isn't in the destination folder yet.
-        //The SDK still has to put the new node.
-        //onNodes update will be called with node->tag == transfer->getTag()
-        //so we save the path of the file to show it later
-        if ((e->getErrorCode() == MegaError::API_OK) && (!transfer->isSyncTransfer()))
+        if (!firstTransferTimer->isActive())
         {
-            QString localPath = QString::fromUtf8(transfer->getPath());
-#ifdef WIN32
-            if (localPath.startsWith(QString::fromAscii("\\\\?\\")))
-            {
-                localPath = localPath.mid(4);
-            }
-#endif
-            uploadLocalPaths[transfer->getTag()]=localPath;
+            firstTransferTimer->start();
         }
     }
 
-    //Send updated statics to the information dialog
-    if (infoDialog)
+    if (type == MegaTransfer::TYPE_UPLOAD)
     {
         if (e->getErrorCode() == MegaError::API_OK)
         {
-            if (((transfer->getType() == MegaTransfer::TYPE_DOWNLOAD) && (transfer->getStartTime()>=lastStartedDownload)) ||
-                ((transfer->getType() == MegaTransfer::TYPE_UPLOAD) && (transfer->getStartTime()>=lastStartedUpload)))
-            {
-                infoDialog->setTransfer(transfer);
-            }
-
-            infoDialog->setTransferSpeeds(downloadSpeed, uploadSpeed);
-            infoDialog->setTransferredSize(totalDownloadedSize, totalUploadedSize);
-        }
-
-        infoDialog->updateTransfers();
-        infoDialog->transferFinished(e->getErrorCode());
-    }
-
-    if (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD)
-    {
-        if (lastStartedDownload == transfer->getStartTime())
-        {
-            lastStartedDownload = 0;
-        }
-    }
-    else
-    {
-        if (lastStartedUpload == transfer->getStartTime())
-        {
-            lastStartedUpload = 0;
-        }
-
-        if ((e->getErrorCode() == MegaError::API_OK))
-        {
-            if (settingsDialog)
-            {
-                settingsDialog->refreshAccountDetails();
-            }
-
             if (infoDialog)
             {
                 bool isShare = false;
@@ -5165,6 +5707,11 @@ void MegaApplication::onTransferFinish(MegaApi* , MegaTransfer *transfer, MegaEr
 
                 delete node;
                 delete [] path;
+            }
+
+            if (settingsDialog)
+            {
+                settingsDialog->refreshAccountDetails();
             }
         }
     }
@@ -5184,57 +5731,51 @@ void MegaApplication::onTransferFinish(MegaApi* , MegaTransfer *transfer, MegaEr
     }
 
     //If there are no pending transfers, reset the statics and update the state of the tray icon
-    if (!megaApi->getNumPendingDownloads() && !megaApi->getNumPendingUploads())
+    if (!numTransfers[MegaTransfer::TYPE_DOWNLOAD]
+            && !numTransfers[MegaTransfer::TYPE_UPLOAD])
     {
-        if (totalUploadSize || totalDownloadSize)
-        {
-            onGlobalSyncStateChanged(megaApi);
-        }
-
-        totalUploadSize = totalDownloadSize = 0;
-        totalUploadedSize = totalDownloadedSize = 0;
-        uploadSpeed = downloadSpeed = 0;
+        onGlobalSyncStateChanged(megaApi);
     }
 }
 
 //Called when a transfer has been updated
 void MegaApplication::onTransferUpdate(MegaApi *, MegaTransfer *transfer)
 {
-    if (appfinished || transfer->isStreamingTransfer() || transfer->isFolderTransfer())
+    if (appfinished || transfer->isStreamingTransfer() || transfer->isFolderTransfer()
+            || !transfer->getPriority()) // Skipped transfer
     {
         return;
     }
 
-    //Update statics
-    if (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD)
+    if (transferManager)
     {
-        downloadSpeed = transfer->getSpeed();
-        if (!lastStartedDownload || !transfer->getTransferredBytes())
-        {
-            lastStartedDownload = transfer->getStartTime();
-        }
-        totalDownloadedSize += transfer->getDeltaSize();
-    }
-    else
-    {
-        uploadSpeed = transfer->getSpeed();
-        if (!lastStartedUpload || !transfer->getTransferredBytes())
-        {
-            lastStartedUpload = transfer->getStartTime();
-        }
-        totalUploadedSize += transfer->getDeltaSize();
+        transferManager->onTransferUpdate(megaApi, transfer);
     }
 
-    //Send updated statics to the information dialog
-    if (infoDialog)
+    int type = transfer->getType();
+    unsigned long long priority = transfer->getPriority();    
+    if (priority <= activeTransferPriority[type]
+            || activeTransferState[type] == MegaTransfer::STATE_PAUSED)
     {
-        if (((transfer->getType() == MegaTransfer::TYPE_DOWNLOAD) && (transfer->getStartTime()>=lastStartedDownload)) ||
-            ((transfer->getType() == MegaTransfer::TYPE_UPLOAD) && (transfer->getStartTime()>=lastStartedUpload)))
+        activeTransferPriority[type] = priority;
+        activeTransferState[type] = transfer->getState();
+        activeTransferTag[type] = transfer->getTag();
+
+        if (infoDialog)
         {
             infoDialog->setTransfer(transfer);
-            infoDialog->setTransferSpeeds(downloadSpeed, uploadSpeed);
-            infoDialog->setTransferredSize(totalDownloadedSize, totalUploadedSize);
             infoDialog->updateTransfers();
+        }
+    }
+    else if (activeTransferTag[type] == transfer->getTag())
+    {
+        // First transfer moved to a lower priority
+        activeTransferPriority[type] = 0xFFFFFFFFFFFFFFFFULL;
+        activeTransferState[type] = MegaTransfer::STATE_NONE;
+        activeTransferTag[type] = 0;
+        if (!firstTransferTimer->isActive())
+        {
+            firstTransferTimer->start();
         }
     }
 }
@@ -5247,11 +5788,12 @@ void MegaApplication::onTransferTemporaryError(MegaApi *api, MegaTransfer *trans
         return;
     }
 
-    if (!transfer->isStreamingTransfer())
+    if (transferManager)
     {
-        onTransferUpdate(api, transfer);
+        transferManager->onTransferTemporaryError(megaApi, transfer, e);
     }
 
+    onTransferUpdate(api, transfer);
     preferences->setTransferDownloadMethod(api->getDownloadMethod());
     preferences->setTransferUploadMethod(api->getUploadMethod());
 
@@ -5367,7 +5909,9 @@ void MegaApplication::onNodesUpdate(MegaApi* , MegaNodeList *nodes)
                         showErrorMessage(tr("Your sync \"%1\" has been disabled because the remote folder doesn't exist")
                                          .arg(preferences->getSyncName(i)));
                     }
-                    Platform::syncFolderRemoved(preferences->getLocalFolder(i), preferences->getSyncName(i));
+                    Platform::syncFolderRemoved(preferences->getLocalFolder(i),
+                                                preferences->getSyncName(i),
+                                                preferences->getSyncID(i));
                     Platform::notifyItemChange(preferences->getLocalFolder(i));
                     MegaNode *node = megaApi->getNodeByHandle(preferences->getMegaFolderHandle(i));
                     megaApi->removeSync(node);
@@ -5396,68 +5940,37 @@ void MegaApplication::onNodesUpdate(MegaApi* , MegaNodeList *nodes)
 
         if (!node->isRemoved() && node->getTag()
                 && !node->isSyncDeleted()
-                && (node->getType() == MegaNode::TYPE_FILE))
+                && (node->getType() == MegaNode::TYPE_FILE)
+                && node->getAttrString()->size())
         {
-            //Get the associated local node
-            string path = node->getLocalPath();
-            if (path.size())
+            //NO_KEY node created by this client detected
+            if (!noKeyDetected)
             {
-                //If the node has been uploaded by a synced folder
-                //the SDK provides its local path
-#ifdef WIN32
-                localPath = QString::fromWCharArray((const wchar_t *)path.data());
-                if (localPath.startsWith(QString::fromAscii("\\\\?\\")))
+                if (megaApi->isLoggedIn())
                 {
-                    localPath = localPath.mid(4);
+                    megaApi->fetchNodes();
                 }
-#else
-                localPath = QString::fromUtf8(path.data());
-#endif
             }
-            else if (uploadLocalPaths.contains(node->getTag()))
+            else if (noKeyDetected > 20)
             {
-                //If the node has been uploaded by a regular upload,
-                //we recover the path using the tag of the transfer
-                localPath = uploadLocalPaths.value(node->getTag());
-                uploadLocalPaths.remove(node->getTag());
+                QMegaMessageBox::critical(NULL, QString::fromUtf8("MEGAsync"),
+                    QString::fromUtf8("Something went wrong. MEGAsync will restart now. If the problem persists please contact bug@mega.co.nz"), Utilities::getDevicePixelRatio());
+                preferences->setCrashed(true);
+                rebootApplication(false);
             }
-
-            addRecentFile(QString::fromUtf8(node->getName()), node->getHandle(), localPath);
-            if (node->getAttrString()->size())
-            {
-                //NO_KEY node created by this client detected
-                if (!noKeyDetected)
-                {
-                    if (megaApi->isLoggedIn())
-                    {
-                        megaApi->fetchNodes();
-                    }
-                }
-                else if (noKeyDetected > 20)
-                {
-                    QMessageBox::critical(NULL, QString::fromUtf8("MEGAsync"),
-                        QString::fromUtf8("Something went wrong. MEGAsync will restart now. If the problem persists please contact bug@mega.co.nz"));
-                    preferences->setCrashed(true);
-                    rebootApplication(false);
-                }
-                noKeyDetected++;
-            }
+            noKeyDetected++;
         }
     }
 
     if (nodesRemoved)
     {
         preferences->setUsedStorage(usedStorage);
-        if (infoOverQuota)
-        {
-            updateUserStats();
-        }
+        updateUserStats();
     }
 
     if (externalNodes)
     {
         updateUserStats();
-
         if (QDateTime::currentMSecsSinceEpoch() - externalNodesTimestamp > Preferences::MIN_EXTERNAL_NODES_WARNING_MS)
         {
             externalNodesTimestamp = QDateTime::currentMSecsSinceEpoch();
@@ -5477,7 +5990,6 @@ void MegaApplication::onReloadNeeded(MegaApi*)
     //and the most probable cause for this callback is a false positive.
     //Simply set the crashed flag to force a filesystem reload in the next execution.
     preferences->setCrashed(true);
-    //megaApi->fetchNodes();
 }
 
 void MegaApplication::onGlobalSyncStateChanged(MegaApi *)
@@ -5487,7 +5999,7 @@ void MegaApplication::onGlobalSyncStateChanged(MegaApi *)
         return;
     }
 
-    if (megaApi)
+    if (megaApi && infoDialog)
     {
         indexing = megaApi->isScanning();
         waiting = megaApi->isWaiting();
@@ -5503,16 +6015,18 @@ void MegaApplication::onGlobalSyncStateChanged(MegaApi *)
         {
             MegaApi::log(MegaApi::LOG_LEVEL_INFO, QString::fromUtf8("Pending downloads: %1").arg(pendingDownloads).toUtf8().constData());
         }
-    }
 
-    if (infoDialog)
-    {
         infoDialog->setIndexing(indexing);
         infoDialog->setWaiting(waiting);
         infoDialog->setPaused(paused);
         infoDialog->updateState();
         infoDialog->transferFinished(MegaError::API_OK);
         infoDialog->updateRecentFiles();
+    }
+
+    if (transferManager)
+    {
+        transferManager->updateState();
     }
 
     MegaApi::log(MegaApi::LOG_LEVEL_INFO, QString::fromUtf8("Current state. Paused = %1   Indexing = %2   Waiting = %3")
@@ -5545,9 +6059,11 @@ void MegaApplication::onSyncFileStateChanged(MegaApi *, MegaSync *, const char *
     Platform::notifyItemChange(localPath);
 }
 
-MEGASyncDelegateListener::MEGASyncDelegateListener(MegaApi *megaApi, MegaListener *parent)
+MEGASyncDelegateListener::MEGASyncDelegateListener(MegaApi *megaApi, MegaListener *parent, MegaApplication *app)
     : QTMegaListener(megaApi, parent)
-{ }
+{
+    this->app = app;
+}
 
 void MEGASyncDelegateListener::onRequestFinish(MegaApi *api, MegaRequest *request, MegaError *e)
 {
@@ -5563,6 +6079,14 @@ void MEGASyncDelegateListener::onRequestFinish(MegaApi *api, MegaRequest *reques
     Preferences *preferences = Preferences::instance();
     if (preferences->logged() && !api->getNumActiveSyncs())
     {
+#ifdef _WIN32
+        bool addToLeftPane = false;
+        if (app && app->getPrevVersion() && app->getPrevVersion() <= 3001 && !preferences->leftPaneIconsDisabled())
+        {
+            addToLeftPane = true;
+        }
+#endif
+
         //Start syncs
         for (int i = 0; i < preferences->getNumSyncedFolders(); i++)
         {
@@ -5579,6 +6103,16 @@ void MEGASyncDelegateListener::onRequestFinish(MegaApi *api, MegaRequest *reques
             }
 
             QString localFolder = preferences->getLocalFolder(i);
+
+#ifdef _WIN32
+            if (addToLeftPane)
+            {
+                QString name = preferences->getSyncName(i);
+                QString uuid = preferences->getSyncID(i);
+                Platform::addSyncToLeftPane(localFolder, name, uuid);
+            }
+#endif
+
             api->resumeSync(localFolder.toUtf8().constData(), node, preferences->getLocalFingerprint(i));
             delete node;
         }

@@ -9,7 +9,7 @@ Source0:	megasync_%{version}.tar.gz
 Vendor:		MEGA Limited
 Packager:	MEGA Linux Team <linux@mega.co.nz>
 
-BuildRequires: qt-devel, openssl-devel, sqlite-devel, zlib-devel, autoconf, automake, libtool, gcc-c++
+BuildRequires: openssl-devel, sqlite-devel, zlib-devel, autoconf, automake, libtool, gcc-c++
 BuildRequires: hicolor-icon-theme, unzip, wget
 
 %if 0%{?suse_version}
@@ -20,7 +20,7 @@ BuildRequires: update-desktop-files
 BuildRequires: libqt5-qtbase-devel >= 5.6, libqt5-linguist
 Requires: libQt5Core5 >= 5.6
 %else
-BuildRequires: libqt4-devel
+BuildRequires: libqt4-devel, qt-devel
 %endif
 
 # disabling post-build-checks that ocassionally prevent opensuse rpms from being generated
@@ -45,7 +45,7 @@ BuildRequires: terminus-fonts, fontpackages-filesystem
 %else
 BuildRequires: c-ares-devel, cryptopp-devel
 BuildRequires: desktop-file-utils
-BuildRequires: qt, qt-x11
+BuildRequires: qt, qt-x11, qt-devel
 BuildRequires: terminus-fonts, fontpackages-filesystem
 %endif
 %endif
@@ -53,12 +53,12 @@ BuildRequires: terminus-fonts, fontpackages-filesystem
 %if 0%{?centos_version} || 0%{?scientificlinux_version}
 BuildRequires: c-ares-devel,
 BuildRequires: desktop-file-utils
-BuildRequires: qt, qt-x11
+BuildRequires: qt, qt-x11, qt-devel
 %endif
 
 %if 0%{?rhel_version}
 BuildRequires: desktop-file-utils
-BuildRequires: qt, qt-x11
+BuildRequires: qt, qt-x11, qt-devel
 %endif
 
 
@@ -145,6 +145,9 @@ desktop-file-install \
 %{buildroot}%{_datadir}/applications/%{name}.desktop
 %endif
 
+mkdir -p  %{buildroot}/etc/sysctl.d/
+echo "fs.inotify.max_user_watches = 524288" > %{buildroot}/etc/sysctl.d/100-megasync-inotify-limit.conf
+
 %post
 %if 0%{?suse_version} >= 1140
 %desktop_database_post
@@ -159,7 +162,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/RHEL_7/
+baseurl=https://mega.nz/linux/MEGAsync/RHEL_7/
 gpgkey=https://mega.nz/linux/MEGAsync/RHEL_7/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -172,21 +175,47 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/ScientificLinux_7/
+baseurl=https://mega.nz/linux/MEGAsync/ScientificLinux_7/
 gpgkey=https://mega.nz/linux/MEGAsync/ScientificLinux_7/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
 DATA
 %endif
 
-%if 0%{?sc} == 700
+%if 0%{?centos_version} == 700
 # CentOS 7
 YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/CentOS_7/
+baseurl=https://mega.nz/linux/MEGAsync/CentOS_7/
 gpgkey=https://mega.nz/linux/MEGAsync/CentOS_7/repodata/repomd.xml.key
+gpgcheck=1
+enabled=1
+DATA
+%endif
+
+%if 0%{?fedora_version} == 26
+# Fedora 26
+YUM_FILE="/etc/yum.repos.d/megasync.repo"
+cat > "$YUM_FILE" << DATA
+[MEGAsync]
+name=MEGAsync
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_26/
+gpgkey=https://mega.nz/linux/MEGAsync/Fedora_26/repodata/repomd.xml.key
+gpgcheck=1
+enabled=1
+DATA
+%endif
+
+%if 0%{?fedora_version} == 25
+# Fedora 25
+YUM_FILE="/etc/yum.repos.d/megasync.repo"
+cat > "$YUM_FILE" << DATA
+[MEGAsync]
+name=MEGAsync
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_25/
+gpgkey=https://mega.nz/linux/MEGAsync/Fedora_25/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
 DATA
@@ -198,7 +227,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_24/
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_24/
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_24/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -211,7 +240,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_23/
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_23/
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_23/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -224,7 +253,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_22/
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_22/
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_22/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -237,7 +266,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_21/
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_21/
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_21/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -250,7 +279,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_20/
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_20/
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_20/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -263,7 +292,7 @@ YUM_FILE="/etc/yum.repos.d/megasync.repo"
 cat > "$YUM_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
-baseurl=http://mega.nz/linux/MEGAsync/Fedora_19
+baseurl=https://mega.nz/linux/MEGAsync/Fedora_19
 gpgkey=https://mega.nz/linux/MEGAsync/Fedora_19/repodata/repomd.xml.key
 gpgcheck=1
 enabled=1
@@ -278,10 +307,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_Leap_42.2/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_Leap_42.2/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_Leap_42.2/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_Leap_42.2/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -296,10 +325,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_Leap_42.1/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_Leap_42.1/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_Leap_42.1/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_Leap_42.1/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -314,10 +343,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_Tumbleweed/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_Tumbleweed/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_Tumbleweed/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_Tumbleweed/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -331,10 +360,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_13.2/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_13.2/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_13.2/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_13.2/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -348,10 +377,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_13.1/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_13.1/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_13.1/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_13.1/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -365,10 +394,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_12.3/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_12.3/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_12.3/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_12.3/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -382,10 +411,10 @@ cat > "$ZYPP_FILE" << DATA
 [MEGAsync]
 name=MEGAsync
 type=rpm-md
-baseurl=http://mega.nz/linux/MEGAsync/openSUSE_12.2/
+baseurl=https://mega.nz/linux/MEGAsync/openSUSE_12.2/
 gpgcheck=1
 autorefresh=1
-gpgkey=http://mega.nz/linux/MEGAsync/openSUSE_12.2/repodata/repomd.xml.key
+gpgkey=https://mega.nz/linux/MEGAsync/openSUSE_12.2/repodata/repomd.xml.key
 enabled=1
 DATA
 fi
@@ -440,6 +469,8 @@ rm $KEYFILE || :
 fi
 fi
 
+sysctl -p /etc/sysctl.d/100-megasync-inotify-limit.conf
+
 ### END of POSTINST
 
 
@@ -473,6 +504,6 @@ killall megasync 2> /dev/null || true
 %{_datadir}/icons/hicolor/*/*/mega.png
 %{_datadir}/doc/megasync
 %{_datadir}/doc/megasync/*
+/etc/sysctl.d/100-megasync-inotify-limit.conf
 
 %changelog
-

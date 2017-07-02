@@ -18,7 +18,7 @@ class Preferences : public QObject
 
 signals:
     void stateChanged();
-    void updated();
+    void updated(int lastVersion);
 
 private:
     static Preferences *preferences;
@@ -74,6 +74,8 @@ public:
     long long totalBandwidth();
     void setTotalBandwidth(long long value);
     bool isTemporalBandwidthValid();
+    long long getMsDiffTimeWithSDK();
+    void setDsDiffTimeWithSDK(long long diffTime);
     void setTemporalBandwidthValid(bool value);
     long long temporalBandwidth();
     void setTemporalBandwidth(long long value);
@@ -103,7 +105,13 @@ public:
     void setHasDefaultImportFolder(bool value);
     bool canUpdate(QString filePath);
     int uploadLimitKB();
+    int downloadLimitKB();
     void setUploadLimitKB(int value);
+    void setDownloadLimitKB(int value);
+    int parallelUploadConnections();
+    int parallelDownloadConnections();
+    void setParallelUploadConnections(int value);
+    void setParallelDownloadConnections(int value);
     long long upperSizeLimitValue();
     void setUpperSizeLimitValue(long long value);
     long long lowerSizeLimitValue();
@@ -151,6 +159,8 @@ public:
     void setFirstFileSynced(bool value = true);
     bool isFirstWebDownloadDone();
     void setFirstWebDownloadDone(bool value = true);
+    bool isFatWarningShown();
+    void setFatWarningShown(bool value = true);
     QString lastCustomStreamingApp();
     void setLastCustomStreamingApp(const QString &value);
     long long getMaxMemoryUsage();
@@ -177,6 +187,7 @@ public:
 
     int getNumSyncedFolders();
     QString getSyncName(int num);
+    QString getSyncID(int num);
     QString getLocalFolder(int num);
     QString getMegaFolder(int num);
     long long getLocalFingerprint(int num);
@@ -186,7 +197,11 @@ public:
     bool isTemporaryInactiveFolder(int num);
     void setSyncState(int num, bool enabled, bool temporaryDisabled = false);
 
+    bool isOneTimeActionDone(int action);
+    void setOneTimeActionDone(int action, bool done);
+
     QStringList getSyncNames();
+    QStringList getSyncIDs();
     QStringList getMegaFolders();
     QStringList getLocalFolders();
     QList<long long> getMegaFolderHandles();
@@ -205,6 +220,15 @@ public:
     long long getLastExit();
     void setLastExit(long long value);
 
+    QString getHttpsKey();
+    void setHttpsKey(QString key);
+    QString getHttpsCert();
+    void setHttpsCert(QString cert);
+    QString getHttpsCertIntermediate();
+    void setHttpsCertIntermediate(QString intermediate);
+    long long getHttpsCertExpiration();
+    void setHttpsCertExpiration(long long expiration);
+
     int getNumUsers();
     void enterUser(int i);
     void leaveUser();
@@ -213,14 +237,20 @@ public:
 
     bool isCrashed();
     void setCrashed(bool value);
-    bool wasPaused();
-    void setWasPaused(bool value);
+    bool getGlobalPaused();
+    void setGlobalPaused(bool value);
+    bool getUploadsPaused();
+    void setUploadsPaused(bool value);
+    bool getDownloadsPaused();
+    void setDownloadsPaused(bool value);
 
     long long lastStatsRequest();
     void setLastStatsRequest(long long value);
 
     bool overlayIconsDisabled();
     void disableOverlayIcons(bool value);
+    bool leftPaneIconsDisabled();
+    void disableLeftPaneIcons(bool value);
     bool error();
 
     QString getDataPath();
@@ -250,7 +280,13 @@ public:
         ACCOUNT_TYPE_FREE = 0,
         ACCOUNT_TYPE_PROI = 1,
         ACCOUNT_TYPE_PROII = 2,
-        ACCOUNT_TYPE_PROIII = 3
+        ACCOUNT_TYPE_PROIII = 3,
+        ACCOUNT_TYPE_LITE = 4
+    };
+
+    enum {
+        ONE_TIME_ACTION_DEPRECATED_OPERATING_SYSTEM = 0,
+        ONE_TIME_ACTION_NO_SYSTRAY_AVAILABLE = 1
     };
 
     static const int MAX_FILES_IN_NEW_SYNC_FOLDER;
@@ -258,6 +294,7 @@ public:
     static const long long MIN_UPDATE_STATS_INTERVAL;
     static const long long MIN_UPDATE_STATS_INTERVAL_OVERQUOTA;
     static const int STATE_REFRESH_INTERVAL_MS;
+    static const int FINISHED_TRANSFER_REFRESH_INTERVAL_MS;
     static const long long MIN_UPDATE_NOTIFICATION_INTERVAL_MS;
     static const unsigned int UPDATE_INITIAL_DELAY_SECS;
     static const unsigned int UPDATE_RETRY_INTERVAL_SECS;
@@ -270,6 +307,11 @@ public:
     static const QString PROXY_TEST_URL;
     static const QString PROXY_TEST_SUBSTRING;
     static const unsigned int PROXY_TEST_TIMEOUT_MS;
+    static const QString LOCAL_HTTPS_TEST_URL;
+    static const QString LOCAL_HTTPS_TEST_POST_DATA;
+    static const QString LOCAL_HTTPS_TEST_SUBSTRING;
+    static const unsigned int LOCAL_HTTPS_TEST_TIMEOUT_MS;
+    static const long long LOCAL_HTTPS_CERT_MAX_EXPIRATION_SECS;
     static const unsigned int MAX_IDLE_TIME_MS;
     static const char UPDATE_PUBLIC_KEY[];
     static const long long MIN_REBOOT_INTERVAL_MS;
@@ -284,11 +326,10 @@ public:
     static const QString TRANSLATION_FOLDER;
     static const QString TRANSLATION_PREFIX;
     static const qint16 HTTPS_PORT;
-    static const QString HTTPS_KEY;
-    static const QString HTTPS_CERT;
-    static const QString HTTPS_CERT_INTERMEDIATE;
+
     static QStringList HTTPS_ALLOWED_ORIGINS;
     static bool HTTPS_ORIGIN_CHECK_ENABLED;
+    static const unsigned int MAX_COMPLETED_ITEMS;
 
 protected:
     QMutex mutex;
@@ -301,6 +342,7 @@ protected:
 
     EncryptedSettings *settings;
     QStringList syncNames;
+    QStringList syncIDs;
     QStringList megaFolders;
     QStringList localFolders;
     QList<long long> megaFolderHandles;
@@ -313,6 +355,7 @@ protected:
     int tempBandwidthInterval;
     bool isTempBandwidthValid;
     QString dataPath;
+    long long diffTimeWithSDK;
 
     static const QString currentAccountKey;
     static const QString syncsGroupKey;
@@ -342,6 +385,9 @@ protected:
     static const QString languageKey;
     static const QString updateAutomaticallyKey;
     static const QString uploadLimitKBKey;
+    static const QString downloadLimitKBKey;
+    static const QString parallelUploadConnectionsKey;
+    static const QString parallelDownloadConnectionsKey;
     static const QString upperSizeLimitKey;
     static const QString lowerSizeLimitKey;
     static const QString upperSizeLimitValueKey;
@@ -358,6 +404,7 @@ protected:
     static const QString proxyUsernameKey;
     static const QString proxyPasswordKey;
     static const QString syncNameKey;
+    static const QString syncIdKey;
     static const QString localFolderKey;
     static const QString megaFolderKey;
     static const QString megaFolderHandleKey;
@@ -380,17 +427,21 @@ protected:
     static const QString isCrashedKey;
     static const QString lastStatsRequestKey;
     static const QString wasPausedKey;
+    static const QString wasUploadsPausedKey;
+    static const QString wasDownloadsPausedKey;
     static const QString lastUpdateTimeKey;
     static const QString lastUpdateVersionKey;
     static const QString previousCrashesKey;
     static const QString lastRebootKey;
     static const QString lastExitKey;
     static const QString disableOverlayIconsKey;
+    static const QString disableLeftPaneIconsKey;
     static const QString sessionKey;
     static const QString firstStartDoneKey;
     static const QString firstSyncDoneKey;
     static const QString firstFileSyncedKey;
     static const QString firstWebDownloadKey;
+    static const QString fatWarningShownKey;
     static const QString installationTimeKey;
     static const QString accountCreationTimeKey;
     static const QString hasLoggedInKey;
@@ -401,11 +452,19 @@ protected:
     static const QString SSLcertificateExceptionKey;
     static const QString maxMemoryUsageKey;
     static const QString maxMemoryReportTimeKey;
+    static const QString oneTimeActionDoneKey;
+    static const QString httpsKeyKey;
+    static const QString httpsCertKey;
+    static const QString httpsCertIntermediateKey;
+    static const QString httpsCertExpirationKey;
 
     static const bool defaultShowNotifications;
     static const bool defaultStartOnStartup;
     static const bool defaultUpdateAutomatically;
     static const int  defaultUploadLimitKB;
+    static const int  defaultDownloadLimitKB;
+    static const int  defaultParallelUploadConnections;
+    static const int  defaultParallelDownloadConnections;
     static const int  defaultProxyType;
     static const int  defaultProxyProtocol;
     static const QString  defaultProxyServer;
@@ -425,6 +484,10 @@ protected:
     static const int defaultFilePermissions;
     static const bool defaultUseHttpsOnly;
     static const bool defaultSSLcertificateException;
+    static const QString defaultHttpsKey;
+    static const QString defaultHttpsCert;
+    static const QString defaultHttpsCertIntermediate;
+    static const long long defaultHttpsCertExpiration;
 };
 
 #endif // PREFERENCES_H
